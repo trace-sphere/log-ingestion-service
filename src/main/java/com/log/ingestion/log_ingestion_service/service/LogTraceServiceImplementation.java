@@ -12,6 +12,7 @@ import com.log.ingestion.log_ingestion_service.repository.LogTraceRepository;
 import com.log.ingestion.log_ingestion_service.specification.LogInventorySpecService;
 import com.log.ingestion.log_ingestion_service.util.LogConstants;
 import com.log.ingestion.log_ingestion_service.validators.RequestConditionalValidatorService;
+import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.json.simple.JSONObject;
@@ -22,6 +23,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -43,7 +45,7 @@ public class LogTraceServiceImplementation implements LogTraceService {
     private final MessageSource messageSource;
     private final RequestConditionalValidatorService conditionalValidator;
     private final LogInventorySpecService logInventorySpecService;
-    private final ExternalRequestService externalRequestService;
+    private final AsynchronousServices asynchronousService;
 
     @Value("${initial.analyze.data.fetch.limit}")
     private Integer fetchLimit;
@@ -85,17 +87,15 @@ public class LogTraceServiceImplementation implements LogTraceService {
                     .stackTrace(logRequestDto.getStackTrace())
                     .exceptionMessage(logRequestDto.getExceptionMessage())
                     .build();
-            UserGeoCoordinate userGeoCoordinate = buildUserGeoCoordinate(logRequestDto.getClientIp());
-            userGeoCoordinate.setTraceId(traceId);
             LogTrace logTrace = new LogTrace();
             BeanUtils.copyProperties(logRequestDto, logTrace);
             logTrace.setExceptionTrace(exceptionTrace);
             logTrace.setHttpTrace(httpTrace);
             logTrace.setMetaDataTrace(metaDataTrace);
             logTrace.setLogPrimaryKey(logPrimeKey);
-            logTrace.setUserGeoCoordinate(userGeoCoordinate);
             logTrace.setIncomingTime(LocalTime.now());
             logTraceRepository.save(logTrace);
+            asynchronousService.saveUserGeoLocation(logPrimeKey, logRequestDto.getClientIp());
             return ServiceResponse.builder()
                     .error(false)
                     .message("Log saved successfully !")
@@ -508,30 +508,6 @@ public class LogTraceServiceImplementation implements LogTraceService {
         } catch (Exception e) {
             log.error(LogConstants.ExceptionMsg.EXCEPTION_PREFIX, e, "mostHittingServices()");
             throw new SearchSpecException("data.geo.location.response.failed");
-        }
-    }
-
-    private UserGeoCoordinate buildUserGeoCoordinate(String clientIp) {
-        try{
-            JSONObject ipStackResponse = externalRequestService.getUserIpDetails(clientIp);
-            ObjectMapper mapper = new ObjectMapper();
-            JSONObject timeZone = mapper.convertValue(ipStackResponse.get("time_zone"), JSONObject.class);
-            return UserGeoCoordinate.builder()
-                    .clientIp(clientIp)
-                    .city(ipStackResponse.get("city").toString())
-                    .country(ipStackResponse.get("country_name").toString())
-                    .continentCode(ipStackResponse.get("continent_code").toString())
-                    .countryCode(ipStackResponse.get("country_code").toString())
-                    .continentName(ipStackResponse.get("continent_name").toString())
-                    .region(ipStackResponse.get("region_name").toString())
-                    .latitude(ipStackResponse.get("latitude").toString())
-                    .longitude(ipStackResponse.get("longitude").toString())
-                    .zipCode(ipStackResponse.get("zip").toString())
-                    .timeZone(timeZone.get("id").toString())
-                    .build();
-        } catch (Exception e){
-            log.error(LogConstants.ExceptionMsg.EXCEPTION_PREFIX, e, "buildUserGeoCoordinate(?)");
-            throw new SearchSpecException("log.creation.failed.msg");
         }
     }
 }
