@@ -30,4 +30,5 @@ public class UserGeoCoordinate {
     private String countryCode;
     private String continentName;
     private String continentCode;
+    private Long trafficCount;
 }

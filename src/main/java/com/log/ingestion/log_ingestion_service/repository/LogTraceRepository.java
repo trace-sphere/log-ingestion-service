@@ -37,7 +37,4 @@ public interface LogTraceRepository extends JpaRepository<LogTrace, LogPrimeKey>
 
     @Query(value = "select count(ht.path) as no_of_hit,round(avg(ht.duration_ms)) as avg_response_time, lt.service_name from http_trace ht left join log_trace lt on ht.http_id = lt.http_trace_id where ht.duration_ms is not null group by lt.service_name order by no_of_hit desc", nativeQuery = true)
     List<AvgResponseByService> getResponseTimeByAndNoOfHitPerService();
-
-    @Query(value = "select count(ugc.client_ip) as traffic_count, ugc.client_ip, ugc.longitude, ugc.latitude, ugc.city from public.user_geo_coordinate ugc group by ugc.client_ip, ugc.latitude, ugc.longitude, ugc.city", nativeQuery = true)
-    List<GeoLocationData> getGeoLocationData();
 }

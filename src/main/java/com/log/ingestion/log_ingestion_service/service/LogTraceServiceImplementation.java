@@ -9,6 +9,7 @@ import com.log.ingestion.log_ingestion_service.exception.LogCreationException;
 import com.log.ingestion.log_ingestion_service.exception.SearchSpecException;
 import com.log.ingestion.log_ingestion_service.projections.*;
 import com.log.ingestion.log_ingestion_service.repository.LogTraceRepository;
+import com.log.ingestion.log_ingestion_service.repository.UserGeoCoordinateRepository;
 import com.log.ingestion.log_ingestion_service.specification.LogInventorySpecService;
 import com.log.ingestion.log_ingestion_service.util.LogConstants;
 import com.log.ingestion.log_ingestion_service.validators.RequestConditionalValidatorService;
@@ -46,6 +47,7 @@ public class LogTraceServiceImplementation implements LogTraceService {
     private final RequestConditionalValidatorService conditionalValidator;
     private final LogInventorySpecService logInventorySpecService;
     private final AsynchronousServices asynchronousService;
+    private final UserGeoCoordinateRepository geoCoordinateRepository;
 
     @Value("${initial.analyze.data.fetch.limit}")
     private Integer fetchLimit;
@@ -496,7 +498,7 @@ public class LogTraceServiceImplementation implements LogTraceService {
     @Override
     public SearchResponse getGeoLocationData() {
         try {
-            List<GeoLocationData> geoLocationData = logTraceRepository.getGeoLocationData();
+            List<GeoLocationData> geoLocationData = geoCoordinateRepository.getGeoLocationData();
             JSONObject response = new JSONObject();
             response.put("data", geoLocationData);
             response.put("fetchedDataSize", geoLocationData.size());

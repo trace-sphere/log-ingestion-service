@@ -5,5 +5,5 @@ public interface GeoLocationData {
     String getRegion();
     String getLatitude();
     String getLongitude();
-    String getTrafficCount();
+    String getAppTrafficCount();
 }
