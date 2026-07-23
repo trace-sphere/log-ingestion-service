@@ -2,10 +2,7 @@ package com.log.ingestion.log_ingestion_service.exception.handler;
 
 import com.log.ingestion.log_ingestion_service.dto.SearchResponse;
 import com.log.ingestion.log_ingestion_service.dto.ServiceResponse;
-import com.log.ingestion.log_ingestion_service.exception.ConditionalValidatorException;
-import com.log.ingestion.log_ingestion_service.exception.ExternalApiRequestException;
-import com.log.ingestion.log_ingestion_service.exception.LogCreationException;
-import com.log.ingestion.log_ingestion_service.exception.SearchSpecException;
+import com.log.ingestion.log_ingestion_service.exception.*;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.ConstraintViolationException;
 import lombok.RequiredArgsConstructor;
@@ -115,6 +112,19 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(ExternalApiRequestException.class)
     public ResponseEntity<ServiceResponse> handelExternalApiRequestException(ExternalApiRequestException ex) {
+        return new ResponseEntity<ServiceResponse>(
+                ServiceResponse.builder()
+                        .message(
+                                messageSource.getMessage(ex.getMessage(), null, Locale.ENGLISH))
+                        .error(true)
+                        .details(List.of())
+                        .build(),
+                HttpStatus.OK
+        );
+    }
+
+    @ExceptionHandler(ElasticOperationException.class)
+    public ResponseEntity<ServiceResponse> handelElasticOperationException(ElasticOperationException ex) {
         return new ResponseEntity<ServiceResponse>(
                 ServiceResponse.builder()
                         .message(

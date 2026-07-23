@@ -1,6 +1,8 @@
 package com.log.ingestion.log_ingestion_service.controller;
 
+import com.log.ingestion.log_ingestion_service.document.LogTraceDocument;
 import com.log.ingestion.log_ingestion_service.dto.*;
+import com.log.ingestion.log_ingestion_service.service.DashboardAnalyzerWithElasticService;
 import com.log.ingestion.log_ingestion_service.service.ExternalRequestService;
 import com.log.ingestion.log_ingestion_service.service.LogTraceService;
 import jakarta.validation.Valid;
@@ -10,6 +12,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
+
 @RequiredArgsConstructor
 @RestController
 @RequestMapping("/logTrace")
@@ -17,6 +21,7 @@ import org.springframework.web.bind.annotation.*;
 public class LogTraceController {
 
     private final LogTraceService logtraceService;
+    private final DashboardAnalyzerWithElasticService analyzerService;
 
     @PostMapping("/save")
     public ResponseEntity<ServiceResponse> save(@Valid @RequestBody LogRequestDto requestBody) {

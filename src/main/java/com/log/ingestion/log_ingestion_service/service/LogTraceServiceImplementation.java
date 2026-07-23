@@ -48,6 +48,7 @@ public class LogTraceServiceImplementation implements LogTraceService {
     private final LogInventorySpecService logInventorySpecService;
     private final AsynchronousServices asynchronousService;
     private final UserGeoCoordinateRepository geoCoordinateRepository;
+    private final DashboardAnalyzerWithElasticService analyzerService;
 
     @Value("${initial.analyze.data.fetch.limit}")
     private Integer fetchLimit;
@@ -238,48 +239,25 @@ public class LogTraceServiceImplementation implements LogTraceService {
     @Override
     public SearchResponse getAllCardData() {
         try {
-            List<LogTrace> logTraceList = logTraceRepository.findAll();
-            Map<String, Long> httpStatusMap = logTraceList.stream().collect(Collectors
-                    .groupingBy(
-                            logTrace -> logTrace.getHttpTrace().getStatus(),
-                            Collectors.counting()));
-            Map<String, Long> eventTypeMap = logTraceList.stream().collect(Collectors.groupingBy(
-                    logTrace -> logTrace.getEventType().toString(),
-                    Collectors.counting()));
-            Map<String, Long> levelTypeMap = logTraceList.stream().collect(
-                    Collectors.groupingBy(logTrace -> logTrace.getLevel().toString(),
-                            Collectors.counting())
-            );
-            Integer avgRequestDuration = logTraceList.stream()
-                    .collect(Collectors.averagingInt(log -> {
-                        if (log.getHttpTrace().getDurationMs() == null) {
-                            return 0;
-                        } else {
-                            return log.getHttpTrace().getDurationMs();
-                        }
-                    })).intValue();
+            long totalDataCount = analyzerService.getDataCount();
+            double successRate = analyzerService.getSuccessRateInRequests();
+            double averageDuration = analyzerService.getAvgResponseTimeOfApplication();
 
-            long noOfSuccessRate = logTraceList.stream().filter(log -> {
-                if (log.getHttpTrace().getStatus() != null) {
-                    return log.getHttpTrace().getStatus().startsWith("2");
-                } else {
-                    return false;
-                }
-            }).count();
-            Long totalDataCount = (long) logTraceList.size();
-            double successRate = (Double) (double) noOfSuccessRate / totalDataCount.doubleValue() * 100;
-            successRate = BigDecimal.valueOf(successRate).setScale(2, RoundingMode.HALF_UP).doubleValue();
             JSONObject response = new JSONObject();
             JSONObject requestPerformance = new JSONObject();
-            requestPerformance.put("averageDurationMs", avgRequestDuration);
+            requestPerformance.put("averageDurationMs", averageDuration);
             requestPerformance.put("successRate", successRate);
             response.put("totalDataCount", totalDataCount);
 
+            JSONObject eventTypeDataCount = analyzerService.getTotalRequestCountByEventType();
+            JSONObject statusTypeDataCount = analyzerService.getStatusTypeCount();
+            JSONObject levelTypeDataCount = analyzerService.getLevelTypeCount();
+
             List<JSONObject> responseList = new ArrayList<>();
             response.put("data", responseList);
-            response.put("httpStatusMetaData", new JSONObject(httpStatusMap));
-            response.put("eventTypeMetaData", new JSONObject(eventTypeMap));
-            response.put("levelMetaData", new JSONObject(levelTypeMap));
+            response.put("httpStatusMetaData", statusTypeDataCount);
+            response.put("eventTypeMetaData", eventTypeDataCount);
+            response.put("levelMetaData", levelTypeDataCount);
             response.put("requestStates", requestPerformance);
             return new SearchResponse().toBuilder()
                     .error(false)
