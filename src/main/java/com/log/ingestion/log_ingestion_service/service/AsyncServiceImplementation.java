@@ -1,28 +1,34 @@
 package com.log.ingestion.log_ingestion_service.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.log.ingestion.log_ingestion_service.document.LogTraceDocument;
+import com.log.ingestion.log_ingestion_service.dto.LogRequestDto;
+import com.log.ingestion.log_ingestion_service.dto.LogTraceDocumentDto;
 import com.log.ingestion.log_ingestion_service.entity.LogPrimeKey;
 import com.log.ingestion.log_ingestion_service.entity.LogTrace;
 import com.log.ingestion.log_ingestion_service.entity.UserGeoCoordinate;
 import com.log.ingestion.log_ingestion_service.exception.LogCreationException;
 import com.log.ingestion.log_ingestion_service.exception.SearchSpecException;
+import com.log.ingestion.log_ingestion_service.repository.LogElasticRepository;
 import com.log.ingestion.log_ingestion_service.repository.LogTraceRepository;
 import com.log.ingestion.log_ingestion_service.repository.UserGeoCoordinateRepository;
 import com.log.ingestion.log_ingestion_service.util.LogConstants;
-import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.json.simple.JSONObject;
+import org.springframework.beans.BeanUtils;
 import org.springframework.context.MessageSource;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
 
 @Slf4j
 @RequiredArgsConstructor
@@ -33,6 +39,7 @@ public class AsyncServiceImplementation implements AsynchronousServices {
     private final MessageSource messageSource;
     private final ExternalRequestService externalRequestService;
     private final UserGeoCoordinateRepository geoCoordinateRepository;
+    private final LogElasticRepository logElasticRepository;
 
     private final Object geoLock = new Object();
 
@@ -96,5 +103,54 @@ public class AsyncServiceImplementation implements AsynchronousServices {
             log.error(LogConstants.ExceptionMsg.EXCEPTION_PREFIX, e, "buildUserGeoCoordinate(?)");
             throw new SearchSpecException("log.creation.failed.msg");
         }
+    }
+
+    @Async
+    @Override
+    public void saveDataToElasticSearch(LogTrace logTrace) {
+        try {
+            LogTraceDocument logDocument = buildLogTraceDocument(logTrace);
+            logElasticRepository.save(logDocument);
+            log.info("Log document data saved successfully in elastic search...!");
+        } catch (Exception ex) {
+            log.error(LogConstants.ExceptionMsg.EXCEPTION_PREFIX, ex.getMessage(), "saveDataToElasticSearch(LogRequestDto logRequestDto)");
+            throw ex;
+        }
+    }
+
+    public LogTraceDocument buildLogTraceDocument(LogTrace logRequest) {
+        try {
+            return LogTraceDocument.builder()
+                    .traceId(logRequest.getLogPrimaryKey().getTraceId())
+                    .exceptionClass(blankToNull(logRequest.getExceptionTrace().getExceptionClass()))
+                    .host(logRequest.getHost())
+                    .level(Objects.toString(logRequest.getLevel(), null))
+                    .exceptionMessage(logRequest.getExceptionTrace().getExceptionMessage())
+                    .message(logRequest.getMessage())
+                    .path(logRequest.getHttpTrace().getPath())
+                    .durationMs(logRequest.getHttpTrace().getDurationMs())
+                    .stackTrace(logRequest.getExceptionTrace().getStackTrace())
+                    .environment(blankToNull(logRequest.getEnvironment()))
+                    .eventType(Objects.toString(logRequest.getEventType(), null))
+                    .incomingTime(LocalTime.now())
+                    .instanceId(logRequest.getInstanceId())
+                    .logger(logRequest.getLogger())
+                    .serviceName(logRequest.getServiceName())
+                    .timeStamp(logRequest.getExceptionTrace().getTimeStamp() == null ? null : logRequest.getExceptionTrace().getTimeStamp().toLocalDateTime())
+                    .clientIp(blankToNull(logRequest.getHttpTrace().getClientIp()))
+                    .method(blankToNull(logRequest.getHttpTrace().getMethod()))
+                    .status(blankToNull(logRequest.getHttpTrace().getStatus()))
+                    .thread(logRequest.getThread())
+                    .userAgent(logRequest.getHttpTrace().getUserAgent())
+                    .version(logRequest.getMetaDataTrace().getVersion())
+                    .build();
+        } catch (Exception ex) {
+            log.error(LogConstants.ExceptionMsg.EXCEPTION_PREFIX, ex.getMessage(), "buildLogTraceDocumentDto(LogTrace logTrace)");
+            throw ex;
+        }
+    }
+
+    public String blankToNull(String value) {
+        return value == null || value.isBlank() ? null : value;
     }
 }

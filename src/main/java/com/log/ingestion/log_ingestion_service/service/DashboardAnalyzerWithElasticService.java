@@ -1,6 +1,7 @@
 package com.log.ingestion.log_ingestion_service.service;
 
 import com.log.ingestion.log_ingestion_service.document.LogTraceDocument;
+import com.log.ingestion.log_ingestion_service.dto.SearchResponse;
 import com.log.ingestion.log_ingestion_service.dto.ServiceResponse;
 import org.json.simple.JSONObject;
 
@@ -22,5 +23,9 @@ public interface DashboardAnalyzerWithElasticService {
     public JSONObject getStatusTypeCount();
 
     public JSONObject getLevelTypeCount();
+
+    public ServiceResponse deleteAll();
+
+    public SearchResponse getAll();
 
 }

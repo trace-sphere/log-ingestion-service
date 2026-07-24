@@ -99,6 +99,7 @@ public class LogTraceServiceImplementation implements LogTraceService {
             logTrace.setIncomingTime(LocalTime.now());
             logTraceRepository.save(logTrace);
             asynchronousService.saveUserGeoLocation(logPrimeKey, logRequestDto.getClientIp());
+            asynchronousService.saveDataToElasticSearch(logTrace);
             return ServiceResponse.builder()
                     .error(false)
                     .message("Log saved successfully !")

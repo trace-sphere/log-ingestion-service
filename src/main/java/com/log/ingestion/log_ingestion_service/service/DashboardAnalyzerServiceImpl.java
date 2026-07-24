@@ -4,6 +4,7 @@ import co.elastic.clients.elasticsearch._types.aggregations.Aggregate;
 import co.elastic.clients.elasticsearch._types.aggregations.Aggregation;
 import co.elastic.clients.elasticsearch._types.aggregations.MultiBucketBase;
 import com.log.ingestion.log_ingestion_service.document.LogTraceDocument;
+import com.log.ingestion.log_ingestion_service.dto.SearchResponse;
 import com.log.ingestion.log_ingestion_service.dto.ServiceResponse;
 import com.log.ingestion.log_ingestion_service.enums.Events;
 import com.log.ingestion.log_ingestion_service.exception.ElasticOperationException;
@@ -23,10 +24,7 @@ import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Locale;
-import java.util.Map;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -57,6 +55,42 @@ public class DashboardAnalyzerServiceImpl implements DashboardAnalyzerWithElasti
         } catch (Exception e) {
             log.error(LogConstants.ExceptionMsg.EXCEPTION_PREFIX, e.getMessage(), "saveBulk(?)");
             throw new ElasticOperationException("bulk.elastic.save.failed");
+        }
+    }
+
+    @Override
+    public ServiceResponse deleteAll() {
+        try{
+            logElasticRepository.deleteAll();
+            return ServiceResponse.builder()
+                    .error(false)
+                    .message(messageSource.getMessage("bulk.delete.operation.success", null, Locale.ENGLISH))
+                    .details(List.of())
+                    .build();
+        } catch(Exception e) {
+            log.error(LogConstants.ExceptionMsg.EXCEPTION_PREFIX, e.getMessage(), "deleteAll()");
+            throw new ElasticOperationException("bulk.delete.operation.failed");
+        }
+    }
+
+    @Override
+    public SearchResponse getAll() {
+        try{
+            Iterable<LogTraceDocument> logTraceDocuments = logElasticRepository.findAll();
+            List<LogTraceDocument> logTraceDocumentsList = new ArrayList<>();
+            logTraceDocuments.forEach(logTraceDocumentsList::add);
+            JSONObject response = new JSONObject();
+            response.put("fetchedData", logTraceDocumentsList);
+            response.put("totalDataCount", logTraceDocumentsList.size());
+            return SearchResponse.builder()
+                    .error(false)
+                    .message(messageSource.getMessage("get.all.elastic.data.success", null, Locale.ENGLISH))
+                    .results(response)
+                    .build();
+        } catch (Exception ex) {
+            log.error(LogConstants.ExceptionMsg.EXCEPTION_PREFIX, ex.getMessage(), "getAll()");
+//            throw new ElasticOperationException("get.all.elastic.data.failed");
+            throw ex;
         }
     }
 
