@@ -1,18 +1,14 @@
 package com.log.ingestion.log_ingestion_service.controller;
 
-import com.log.ingestion.log_ingestion_service.document.LogTraceDocument;
 import com.log.ingestion.log_ingestion_service.dto.*;
-import com.log.ingestion.log_ingestion_service.service.DashboardAnalyzerWithElasticService;
-import com.log.ingestion.log_ingestion_service.service.ExternalRequestService;
 import com.log.ingestion.log_ingestion_service.service.LogTraceService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.json.simple.JSONObject;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.List;
+import java.time.Instant;
 
 @RequiredArgsConstructor
 @RestController
@@ -21,7 +17,6 @@ import java.util.List;
 public class LogTraceController {
 
     private final LogTraceService logtraceService;
-    private final DashboardAnalyzerWithElasticService analyzerService;
 
     @PostMapping("/save")
     public ResponseEntity<ServiceResponse> save(@Valid @RequestBody LogRequestDto requestBody) {
@@ -36,7 +31,7 @@ public class LogTraceController {
     }
 
     @GetMapping("/getCardData")
-    public ResponseEntity<SearchResponse> getAllCardData(){
+    public ResponseEntity<SearchResponse> getAllCardData() {
         SearchResponse response = logtraceService.getAllCardData();
         return new ResponseEntity<>(response, HttpStatus.OK);
     }
@@ -48,7 +43,7 @@ public class LogTraceController {
     }
 
     @GetMapping("/getDropDown/data")
-    public  ResponseEntity<SearchResponse> getDropDown() {
+    public ResponseEntity<SearchResponse> getDropDown() {
         SearchResponse response = logtraceService.fetchDropDownLists();
         return new ResponseEntity<>(response, HttpStatus.OK);
     }
@@ -86,6 +81,12 @@ public class LogTraceController {
     @GetMapping("/geo/coordinates")
     public ResponseEntity<SearchResponse> getGeoLocationData() {
         SearchResponse response = logtraceService.getGeoLocationData();
+        return new ResponseEntity<>(response, HttpStatus.OK);
+    }
+
+    @GetMapping("/fetchTrace")
+    public ResponseEntity<SearchResponse> fetchTrace(@RequestParam String logId, @RequestParam String traceId, @RequestParam Instant timeStamp) {
+        SearchResponse response = logtraceService.getTraceById(logId, traceId, timeStamp);
         return new ResponseEntity<>(response, HttpStatus.OK);
     }
 }

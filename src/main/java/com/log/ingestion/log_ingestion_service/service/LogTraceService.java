@@ -1,6 +1,9 @@
 package com.log.ingestion.log_ingestion_service.service;
 
 import com.log.ingestion.log_ingestion_service.dto.*;
+import com.log.ingestion.log_ingestion_service.entity.LogPrimeKey;
+
+import java.time.Instant;
 
 public interface LogTraceService {
     public ServiceResponse saveLog(LogRequestDto logRequestDto);
@@ -24,4 +27,6 @@ public interface LogTraceService {
     public SearchResponse getResponseTimeByServices();
 
     public SearchResponse getGeoLocationData();
+
+    public SearchResponse getTraceById(String logId, String traceId, Instant timeStamp);
 }

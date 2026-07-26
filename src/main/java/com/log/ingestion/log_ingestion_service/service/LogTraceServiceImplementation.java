@@ -1,10 +1,10 @@
 package com.log.ingestion.log_ingestion_service.service;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.log.ingestion.log_ingestion_service.dto.*;
 import com.log.ingestion.log_ingestion_service.entity.*;
 import com.log.ingestion.log_ingestion_service.enums.Events;
 import com.log.ingestion.log_ingestion_service.exception.ConditionalValidatorException;
+import com.log.ingestion.log_ingestion_service.exception.DataFetchException;
 import com.log.ingestion.log_ingestion_service.exception.LogCreationException;
 import com.log.ingestion.log_ingestion_service.exception.SearchSpecException;
 import com.log.ingestion.log_ingestion_service.projections.*;
@@ -13,7 +13,6 @@ import com.log.ingestion.log_ingestion_service.repository.UserGeoCoordinateRepos
 import com.log.ingestion.log_ingestion_service.specification.LogInventorySpecService;
 import com.log.ingestion.log_ingestion_service.util.LogConstants;
 import com.log.ingestion.log_ingestion_service.validators.RequestConditionalValidatorService;
-import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.json.simple.JSONObject;
@@ -24,15 +23,11 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
-import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
-import java.time.LocalDate;
-import java.time.LocalDateTime;
-import java.time.LocalTime;
-import java.time.ZoneId;
+import java.time.*;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -151,7 +146,7 @@ public class LogTraceServiceImplementation implements LogTraceService {
             Page<LogTrace> logPage = logTraceRepository.findAll(logTraceSpecification, pageRequest);
             Long totalFetchedDataCount = logPage.stream().count();
             Integer numberOfPages = logPage.getTotalPages();
-            Long totalDataCount = logTraceRepository.count(logTraceSpecification);
+            long totalDataCount = logTraceRepository.count(logTraceSpecification);
             List<LogTrace> logTraceList = logPage.stream().toList();
             Map<String, Long> httpStatusMap = logTraceList.stream().collect(Collectors
                     .groupingBy(
@@ -182,7 +177,7 @@ public class LogTraceServiceImplementation implements LogTraceService {
                     .count();
             double successRate = 0;
             if (!(noOfSuccessRate == 0 || totalDataCount == 0)) {
-                successRate = (Double) (double) noOfSuccessRate / totalDataCount.doubleValue() * 100;
+                successRate = (double) noOfSuccessRate / (double) totalDataCount * 100;
             }
             successRate = BigDecimal.valueOf(successRate).setScale(2, RoundingMode.HALF_UP).doubleValue();
             JSONObject response = new JSONObject();
@@ -237,10 +232,11 @@ public class LogTraceServiceImplementation implements LogTraceService {
         }
     }
 
+    @SuppressWarnings("unchecked")
     @Override
     public SearchResponse getAllCardData() {
         try {
-            long totalDataCount = analyzerService.getDataCount();
+            /*long totalDataCount = analyzerService.getDataCount();
             double successRate = analyzerService.getSuccessRateInRequests();
             double averageDuration = analyzerService.getAvgResponseTimeOfApplication();
 
@@ -259,7 +255,10 @@ public class LogTraceServiceImplementation implements LogTraceService {
             response.put("httpStatusMetaData", statusTypeDataCount);
             response.put("eventTypeMetaData", eventTypeDataCount);
             response.put("levelMetaData", levelTypeDataCount);
-            response.put("requestStates", requestPerformance);
+            response.put("requestStates", requestPerformance);*/
+            DashboardAnalyticsDto analyzedData = analyzerService.getDashBoardAnalytics();
+            JSONObject response = new JSONObject();
+            response.put("analyzedData", analyzedData);
             return new SearchResponse().toBuilder()
                     .error(false)
                     .message(messageSource.getMessage("log.search.success.msg", null, Locale.ENGLISH))
@@ -271,6 +270,7 @@ public class LogTraceServiceImplementation implements LogTraceService {
         }
     }
 
+    @SuppressWarnings("unchecked")
     @Override
     public ServiceResponse getGraphData(GraphDataFilterBody filterBody) {
         LocalDate startDate = filterBody.getFirstDate();
@@ -312,11 +312,12 @@ public class LogTraceServiceImplementation implements LogTraceService {
                     .details(graphDataList)
                     .build();
         } catch (Exception e) {
-            log.error(LogConstants.ExceptionMsg.EXCEPTION_PREFIX, e.getMessage() + e.toString(), "getGraphData()");
+            log.error(LogConstants.ExceptionMsg.EXCEPTION_PREFIX, e.getMessage() + e.getMessage(), "getGraphData()");
             throw new SearchSpecException("graph.data.fetched.fail");
         }
     }
 
+    @SuppressWarnings("unchecked")
     @Override
     public SearchResponse fetchDropDownLists() {
         try {
@@ -363,11 +364,12 @@ public class LogTraceServiceImplementation implements LogTraceService {
                     .results(response)
                     .build();
         } catch (Exception e) {
-            log.error(LogConstants.ExceptionMsg.EXCEPTION_PREFIX, e.toString(), "fetchDropDownLists()");
+            log.error(LogConstants.ExceptionMsg.EXCEPTION_PREFIX, e.getMessage(), "fetchDropDownLists()");
             throw new SearchSpecException("data.drop.down.fetch.failed");
         }
     }
 
+    @SuppressWarnings("unchecked")
     @Override
     public SearchResponse getTopClientIps() {
         try {
@@ -387,6 +389,7 @@ public class LogTraceServiceImplementation implements LogTraceService {
         }
     }
 
+    @SuppressWarnings("unchecked")
     @Override
     public SearchResponse getTopTrafficHours() {
         try {
@@ -420,6 +423,7 @@ public class LogTraceServiceImplementation implements LogTraceService {
         }
     }
 
+    @SuppressWarnings("unchecked")
     @Override
     public SearchResponse getTopTenSlowestApi() {
         try {
@@ -438,6 +442,7 @@ public class LogTraceServiceImplementation implements LogTraceService {
         }
     }
 
+    @SuppressWarnings("unchecked")
     @Override
     public SearchResponse getTopTenMostHittingApiWithAvgResponseTime() {
         try {
@@ -456,6 +461,7 @@ public class LogTraceServiceImplementation implements LogTraceService {
         }
     }
 
+    @SuppressWarnings("unchecked")
     @Override
     public SearchResponse getResponseTimeByServices() {
         try {
@@ -474,6 +480,7 @@ public class LogTraceServiceImplementation implements LogTraceService {
         }
     }
 
+    @SuppressWarnings("unchecked")
     @Override
     public SearchResponse getGeoLocationData() {
         try {
@@ -489,6 +496,56 @@ public class LogTraceServiceImplementation implements LogTraceService {
         } catch (Exception e) {
             log.error(LogConstants.ExceptionMsg.EXCEPTION_PREFIX, e, "mostHittingServices()");
             throw new SearchSpecException("data.geo.location.response.failed");
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    @Override
+    public SearchResponse getTraceById(String logId, String traceId, Instant timeStamp) {
+        LogPrimeKey primeKey = LogPrimeKey.builder()
+                .traceId(traceId)
+                .timeStamp(timeStamp)
+                .logId(logId)
+                .build();
+        Optional<LogTrace> logTraceOptional = logTraceRepository.findById(primeKey);
+        if (logTraceOptional.isEmpty()) {
+            throw new DataFetchException("fetch.trace.data.failed");
+        }
+        try {
+            LogTrace logTraceData = logTraceOptional.get();
+            JSONObject logData = new JSONObject();
+            logData.put("id", logTraceData.getLogPrimaryKey().getLogId());
+            logData.put("timeStamp", logTraceData.getLogPrimaryKey().getTimeStamp());
+            logData.put("serviceName", logTraceData.getServiceName());
+            logData.put("environment", logTraceData.getEnvironment());
+            logData.put("host", logTraceData.getHost());
+            logData.put("instanceId", logTraceData.getInstanceId());
+            logData.put("eventType", logTraceData.getEventType());
+            logData.put("level", logTraceData.getLevel());
+            logData.put("thread", logTraceData.getThread());
+            logData.put("logger", logTraceData.getLogger());
+            logData.put("message", logTraceData.getMessage());
+            logData.put("traceId", logTraceData.getLogPrimaryKey().getTraceId());
+            logData.put("spanId", logTraceData.getSpanId());
+            logData.put("method", logTraceData.getHttpTrace().getMethod());
+            logData.put("path", logTraceData.getHttpTrace().getPath());
+            logData.put("status", logTraceData.getHttpTrace().getStatus());
+            logData.put("durationMs", logTraceData.getHttpTrace().getDurationMs());
+            logData.put("clientIp", logTraceData.getHttpTrace().getClientIp());
+            logData.put("userAgent", logTraceData.getHttpTrace().getUserAgent());
+            logData.put("exceptionClass", logTraceData.getExceptionTrace().getExceptionClass());
+            logData.put("exceptionMessage", logTraceData.getExceptionTrace().getExceptionMessage());
+            logData.put("stackTrace", logTraceData.getExceptionTrace().getStackTrace());
+            JSONObject response = new JSONObject();
+            response.put("traceData", logData);
+            return SearchResponse.builder()
+                    .error(false)
+                    .message(messageSource.getMessage("fetch.trace.data.success", null, Locale.ENGLISH))
+                    .results(response)
+                    .build();
+        } catch (Exception e) {
+            log.error(LogConstants.ExceptionMsg.EXCEPTION_PREFIX, e.getMessage(), "getTraceById(PrimaryKeyDto logPrimeKeyDto)");
+            throw e;
         }
     }
 }

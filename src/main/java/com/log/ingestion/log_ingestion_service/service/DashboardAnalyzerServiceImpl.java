@@ -4,6 +4,7 @@ import co.elastic.clients.elasticsearch._types.aggregations.Aggregate;
 import co.elastic.clients.elasticsearch._types.aggregations.Aggregation;
 import co.elastic.clients.elasticsearch._types.aggregations.MultiBucketBase;
 import com.log.ingestion.log_ingestion_service.document.LogTraceDocument;
+import com.log.ingestion.log_ingestion_service.dto.DashboardAnalyticsDto;
 import com.log.ingestion.log_ingestion_service.dto.SearchResponse;
 import com.log.ingestion.log_ingestion_service.dto.ServiceResponse;
 import com.log.ingestion.log_ingestion_service.enums.Events;
@@ -60,14 +61,14 @@ public class DashboardAnalyzerServiceImpl implements DashboardAnalyzerWithElasti
 
     @Override
     public ServiceResponse deleteAll() {
-        try{
+        try {
             logElasticRepository.deleteAll();
             return ServiceResponse.builder()
                     .error(false)
                     .message(messageSource.getMessage("bulk.delete.operation.success", null, Locale.ENGLISH))
                     .details(List.of())
                     .build();
-        } catch(Exception e) {
+        } catch (Exception e) {
             log.error(LogConstants.ExceptionMsg.EXCEPTION_PREFIX, e.getMessage(), "deleteAll()");
             throw new ElasticOperationException("bulk.delete.operation.failed");
         }
@@ -75,7 +76,7 @@ public class DashboardAnalyzerServiceImpl implements DashboardAnalyzerWithElasti
 
     @Override
     public SearchResponse getAll() {
-        try{
+        try {
             Iterable<LogTraceDocument> logTraceDocuments = logElasticRepository.findAll();
             List<LogTraceDocument> logTraceDocumentsList = new ArrayList<>();
             logTraceDocuments.forEach(logTraceDocumentsList::add);
@@ -95,148 +96,113 @@ public class DashboardAnalyzerServiceImpl implements DashboardAnalyzerWithElasti
     }
 
     @Override
-    public JSONObject getTotalRequestCountByEventType() {
+    public DashboardAnalyticsDto getDashBoardAnalytics() {
         try {
+
             Query query = NativeQuery.builder()
+                    .withMaxResults(0)
+
                     .withAggregation("eventCount",
-                            Aggregation.of(agr ->
-                                    agr.terms(term ->
-                                            term.field("eventType"))))
-                    .build();
-            SearchHits<LogTraceDocument> searchHits = elasticOperations.search(query, LogTraceDocument.class);
-            ElasticsearchAggregations aggregations = (ElasticsearchAggregations) searchHits.getAggregations();
-            assert aggregations != null;
-            ElasticsearchAggregation aggregation = aggregations.aggregations().iterator().next();
-            Map<String, Long> eventCountResponses = aggregation.aggregation()
-                    .getAggregate()
-                    .sterms()
-                    .buckets()
-                    .array()
-                    .stream()
-                    .collect(Collectors.toMap(bucket -> bucket.key().stringValue(), MultiBucketBase::docCount));
-            return new JSONObject(eventCountResponses);
-        } catch (Exception e) {
-            log.error(LogConstants.ExceptionMsg.EXCEPTION_PREFIX, e.getMessage(), "getTotalRequestByEventType()");
-            throw new ElasticOperationException("dashboard.analyze.event.failed");
-        }
-    }
+                            Aggregation.of(a -> a
+                                    .terms(t -> t.field("eventType"))))
 
-    @Override
-    public double getSuccessRateInRequests() {
-        try {
-            Query query = NativeQuery.builder()
-                    .withMaxResults(0)
-                    .withQuery(quer -> quer.term(ter -> ter.field("eventType").value(Events.API_REQUEST.toString())))
-                    .withAggregation("statusCount", Aggregation.of(agr -> agr
-                            .filter(fil -> fil
-                                    .wildcard(wild -> wild
-                                            .field("status")
-                                            .value("2*")
-                                    ))))
-                    .build();
-            SearchHits<LogTraceDocument> searchHits = elasticOperations.search(query, LogTraceDocument.class);
-            long totalCount = searchHits.getTotalHits();
-            ElasticsearchAggregations aggregations = (ElasticsearchAggregations) searchHits.getAggregations();
-            ElasticsearchAggregation aggregation = aggregations.get("statusCount");
-            assert aggregation != null;
-            long successCount = aggregation.aggregation().getAggregate().filter().docCount();
-            double successRate = (Double) (double) successCount / (double) totalCount * 100;
-            successRate = BigDecimal.valueOf(successRate).setScale(2, RoundingMode.HALF_UP).doubleValue();
-            return successRate;
-        } catch (Exception e) {
-            log.error(LogConstants.ExceptionMsg.EXCEPTION_PREFIX, e.getMessage(), "getSuccessRateInRequests()");
-            throw new ElasticOperationException("dashboard.analyze.event.failed");
-        }
-    }
+                    .withAggregation("statusCount",
+                            Aggregation.of(a -> a
+                                    .terms(t -> t.field("status"))))
 
-    @Override
-    public double getAvgResponseTimeOfApplication() {
-        try {
-            Query query = NativeQuery.builder()
-                    .withMaxResults(0)
-                    .withAggregation("averageResponseTime",
-                            Aggregation.of(agr -> agr
-                                    .avg(a -> a.
-                                            field("durationMs"))))
+                    .withAggregation("levelCount",
+                            Aggregation.of(a -> a
+                                    .terms(t -> t.field("level"))))
+
+                    .withAggregation("avgDuration",
+                            Aggregation.of(a -> a
+                                    .avg(avg -> avg.field("durationMs"))))
+
+                    .withAggregation("apiRequest",
+                            Aggregation.of(a -> a
+                                    .filter(f -> f
+                                            .term(t -> t
+                                                    .field("eventType")
+                                                    .value(Events.API_REQUEST.toString())))
+                                    .aggregations("success",
+                                            Aggregation.of(success -> success
+                                                    .filter(filter -> filter
+                                                            .wildcard(w -> w
+                                                                    .field("status")
+                                                                    .value("2*")))))))
                     .build();
-            SearchHits<LogTraceDocument> searchHits = elasticOperations.search(query, LogTraceDocument.class);
+            SearchHits<LogTraceDocument> searchHits =
+                    elasticOperations.search(query, LogTraceDocument.class);
 
             ElasticsearchAggregations aggregations =
                     (ElasticsearchAggregations) searchHits.getAggregations();
-            ElasticsearchAggregation aggregation = aggregations.get("averageResponseTime");
-            assert aggregation != null;
-            Aggregate aggregate = aggregation.aggregation().getAggregate();
-            double averageDuration = aggregate.avg().value();
-            averageDuration = BigDecimal.valueOf(averageDuration).setScale(2, RoundingMode.HALF_UP).doubleValue();
-            return averageDuration;
-        } catch (Exception e) {
-            log.error(LogConstants.ExceptionMsg.EXCEPTION_PREFIX, e.getMessage(), "getSuccessRateInRequests()");
-            throw new ElasticOperationException("dashboard.analyze.event.failed");
-        }
-    }
 
-    @Override
-    public long getDataCount() {
-        try {
-            Query query = NativeQuery.builder().build();
-            return elasticOperations.count(query, LogTraceDocument.class);
-        } catch (Exception e) {
-            log.error(LogConstants.ExceptionMsg.EXCEPTION_PREFIX, e.getMessage(), "getSuccessRateInRequests()");
-            throw new ElasticOperationException("dashboard.analyze.event.failed");
-        }
-    }
-
-    @Override
-    public JSONObject getStatusTypeCount() {
-        try {
-            Query query = NativeQuery.builder()
-                    .withAggregation("statusType",
-                            Aggregation.of(agr ->
-                                    agr.terms(term ->
-                                            term.field("status"))))
-                    .build();
-            SearchHits<LogTraceDocument> searchHits = elasticOperations.search(query, LogTraceDocument.class);
-            ElasticsearchAggregations aggregations = (ElasticsearchAggregations) searchHits.getAggregations();
             assert aggregations != null;
-            ElasticsearchAggregation aggregation = aggregations.aggregations().iterator().next();
-            Map<String, Long> statusCountResponses = aggregation.aggregation()
+
+            DashboardAnalyticsDto dto = new DashboardAnalyticsDto();
+
+            dto.setTotalLogs(searchHits.getTotalHits());
+
+            dto.setEventCounts(getBucketMap(
+                    aggregations.get("eventCount")));
+
+            dto.setStatusCounts(getBucketMap(
+                    aggregations.get("statusCount")));
+
+            dto.setLevelCounts(getBucketMap(
+                    aggregations.get("levelCount")));
+
+            double avgDuration = aggregations.get("avgDuration")
+                    .aggregation()
                     .getAggregate()
-                    .sterms()
-                    .buckets()
-                    .array()
-                    .stream()
-                    .collect(Collectors.toMap(bucket -> bucket.key().stringValue(), MultiBucketBase::docCount));
-             return new JSONObject(statusCountResponses);
+                    .avg()
+                    .value();
+
+            dto.setAverageResponseTime(
+                    BigDecimal.valueOf(avgDuration)
+                            .setScale(2, RoundingMode.HALF_UP)
+                            .doubleValue());
+
+            Aggregate apiRequestAggregate = aggregations.get("apiRequest")
+                    .aggregation()
+                    .getAggregate();
+
+            long totalApiRequests =
+                    apiRequestAggregate.filter().docCount();
+
+            long successRequests =
+                    apiRequestAggregate.filter()
+                            .aggregations()
+                            .get("success")
+                            .filter()
+                            .docCount();
+
+            double successRate = totalApiRequests == 0
+                    ? 0
+                    : (successRequests * 100.0) / totalApiRequests;
+
+            dto.setSuccessRate(
+                    BigDecimal.valueOf(successRate)
+                            .setScale(2, RoundingMode.HALF_UP)
+                            .doubleValue());
+            return dto;
         } catch (Exception e) {
-            log.error(LogConstants.ExceptionMsg.EXCEPTION_PREFIX, e.getMessage(), "getTotalRequestByEventType()");
+            log.error(LogConstants.ExceptionMsg.EXCEPTION_PREFIX, e.getMessage(), "getDashBoardAnalytics()");
             throw new ElasticOperationException("dashboard.analyze.event.failed");
         }
     }
 
-    @Override
-    public JSONObject getLevelTypeCount() {
-        try {
-            Query query = NativeQuery.builder()
-                    .withAggregation("levelCount",
-                            Aggregation.of(agr ->
-                                    agr.terms(term ->
-                                            term.field("level"))))
-                    .build();
-            SearchHits<LogTraceDocument> searchHits = elasticOperations.search(query, LogTraceDocument.class);
-            ElasticsearchAggregations aggregations = (ElasticsearchAggregations) searchHits.getAggregations();
-            assert aggregations != null;
-            ElasticsearchAggregation aggregation = aggregations.aggregations().iterator().next();
-            Map<String, Long> levelCountResponses = aggregation.aggregation()
-                    .getAggregate()
-                    .sterms()
-                    .buckets()
-                    .array()
-                    .stream()
-                    .collect(Collectors.toMap(bucket -> bucket.key().stringValue(), MultiBucketBase::docCount));
-            return new JSONObject(levelCountResponses);
-        } catch (Exception e) {
-            log.error(LogConstants.ExceptionMsg.EXCEPTION_PREFIX, e.getMessage(), "getTotalRequestByEventType()");
-            throw new ElasticOperationException("dashboard.analyze.event.failed");
-        }
+    private Map<String, Long> getBucketMap(ElasticsearchAggregation aggregation) {
+
+        return aggregation.aggregation()
+                .getAggregate()
+                .sterms()
+                .buckets()
+                .array()
+                .stream()
+                .collect(Collectors.toMap(
+                        bucket -> bucket.key().stringValue(),
+                        MultiBucketBase::docCount
+                ));
     }
 }

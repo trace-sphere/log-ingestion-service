@@ -135,4 +135,17 @@ public class GlobalExceptionHandler {
                 HttpStatus.OK
         );
     }
+
+    @ExceptionHandler(DataFetchException.class)
+    public ResponseEntity<ServiceResponse> handelDataFetchException(DataFetchException ex) {
+        return new ResponseEntity<ServiceResponse>(
+                ServiceResponse.builder()
+                        .message(
+                                messageSource.getMessage(ex.getMessage(), null, Locale.ENGLISH))
+                        .error(true)
+                        .details(List.of())
+                        .build(),
+                HttpStatus.OK
+        );
+    }
 }
