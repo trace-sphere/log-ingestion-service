@@ -22,6 +22,8 @@ import java.time.LocalTime;
 public class LogTraceDocument {
 
     @Field(type = FieldType.Keyword)
+    private String tenantId;
+    @Field(type = FieldType.Keyword)
     @Id
     private String traceId;
     @Field(type = FieldType.Keyword)

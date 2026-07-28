@@ -1,4 +1,4 @@
-package com.log.ingestion.log_ingestion_service.service;
+package com.log.ingestion.log_ingestion_service.service.external;
 
 import com.log.ingestion.log_ingestion_service.exception.ExternalApiRequestException;
 import com.log.ingestion.log_ingestion_service.util.LogConstants;
@@ -13,7 +13,7 @@ import org.springframework.web.util.UriComponentsBuilder;
 @Slf4j
 @RequiredArgsConstructor
 @Service
-public class ExternalRequestServiceImpl implements ExternalRequestService{
+public class ExternalRequestServiceImpl implements ExternalRequestService {
 
     private final RestTemplate restTemplate;
 

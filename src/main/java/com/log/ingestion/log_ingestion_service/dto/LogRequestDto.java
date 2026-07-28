@@ -80,4 +80,6 @@ public class LogRequestDto {
     private String exceptionMessage;
 
     private String stackTrace;
+
+    private String apiKey;
 }

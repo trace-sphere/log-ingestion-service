@@ -148,4 +148,17 @@ public class GlobalExceptionHandler {
                 HttpStatus.OK
         );
     }
+
+    @ExceptionHandler(LogAuthenticationException.class)
+    public ResponseEntity<ServiceResponse> handelLogAuthenticationException(LogAuthenticationException ex) {
+        return new ResponseEntity<ServiceResponse>(
+                ServiceResponse.builder()
+                        .message(
+                                messageSource.getMessage(ex.getMessage(), null, Locale.ENGLISH))
+                        .error(true)
+                        .details(List.of())
+                        .build(),
+                HttpStatus.OK
+        );
+    }
 }

@@ -3,7 +3,7 @@ package com.log.ingestion.log_ingestion_service.controller;
 import com.log.ingestion.log_ingestion_service.document.LogTraceDocument;
 import com.log.ingestion.log_ingestion_service.dto.SearchResponse;
 import com.log.ingestion.log_ingestion_service.dto.ServiceResponse;
-import com.log.ingestion.log_ingestion_service.service.DashboardAnalyzerWithElasticService;
+import com.log.ingestion.log_ingestion_service.service.dashboard.DashboardAnalyzerWithElasticService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;

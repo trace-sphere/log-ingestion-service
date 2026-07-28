@@ -1,4 +1,4 @@
-package com.log.ingestion.log_ingestion_service.service;
+package com.log.ingestion.log_ingestion_service.service.dashboard;
 
 import co.elastic.clients.elasticsearch._types.aggregations.Aggregate;
 import co.elastic.clients.elasticsearch._types.aggregations.Aggregation;
@@ -9,6 +9,7 @@ import com.log.ingestion.log_ingestion_service.dto.SearchResponse;
 import com.log.ingestion.log_ingestion_service.dto.ServiceResponse;
 import com.log.ingestion.log_ingestion_service.enums.Events;
 import com.log.ingestion.log_ingestion_service.exception.ElasticOperationException;
+import com.log.ingestion.log_ingestion_service.multitenancy.TenantLocalResolverService;
 import com.log.ingestion.log_ingestion_service.repository.LogElasticRepository;
 import com.log.ingestion.log_ingestion_service.util.LogConstants;
 import lombok.RequiredArgsConstructor;
@@ -36,6 +37,7 @@ public class DashboardAnalyzerServiceImpl implements DashboardAnalyzerWithElasti
     private final LogElasticRepository logElasticRepository;
     private final MessageSource messageSource;
     private final ElasticsearchOperations elasticOperations;
+    private final TenantLocalResolverService tenantResolverService;
 
 
     @Override
@@ -98,8 +100,11 @@ public class DashboardAnalyzerServiceImpl implements DashboardAnalyzerWithElasti
     @Override
     public DashboardAnalyticsDto getDashBoardAnalytics() {
         try {
-
-            Query query = NativeQuery.builder()
+            final String tenantId = tenantResolverService.getCurrentTenant();
+            Query query = NativeQuery.builder().withQuery(with -> with
+                            .term(ter -> ter
+                                    .field("tenantId.keyword")
+                                    .value(tenantId)))
                     .withMaxResults(0)
 
                     .withAggregation("eventCount",

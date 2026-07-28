@@ -1,10 +1,9 @@
-package com.log.ingestion.log_ingestion_service.service;
+package com.log.ingestion.log_ingestion_service.service.dashboard;
 
 import com.log.ingestion.log_ingestion_service.document.LogTraceDocument;
 import com.log.ingestion.log_ingestion_service.dto.DashboardAnalyticsDto;
 import com.log.ingestion.log_ingestion_service.dto.SearchResponse;
 import com.log.ingestion.log_ingestion_service.dto.ServiceResponse;
-import org.json.simple.JSONObject;
 
 import java.util.List;
 

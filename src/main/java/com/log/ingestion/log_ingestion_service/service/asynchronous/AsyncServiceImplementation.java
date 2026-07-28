@@ -1,9 +1,9 @@
-package com.log.ingestion.log_ingestion_service.service;
+package com.log.ingestion.log_ingestion_service.service.asynchronous;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.log.ingestion.log_ingestion_service.config.TenantContext;
 import com.log.ingestion.log_ingestion_service.document.LogTraceDocument;
-import com.log.ingestion.log_ingestion_service.dto.LogRequestDto;
-import com.log.ingestion.log_ingestion_service.dto.LogTraceDocumentDto;
+import com.log.ingestion.log_ingestion_service.dto.UserApiKeyResponseDto;
 import com.log.ingestion.log_ingestion_service.entity.LogPrimeKey;
 import com.log.ingestion.log_ingestion_service.entity.LogTrace;
 import com.log.ingestion.log_ingestion_service.entity.UserGeoCoordinate;
@@ -12,19 +12,17 @@ import com.log.ingestion.log_ingestion_service.exception.SearchSpecException;
 import com.log.ingestion.log_ingestion_service.repository.LogElasticRepository;
 import com.log.ingestion.log_ingestion_service.repository.LogTraceRepository;
 import com.log.ingestion.log_ingestion_service.repository.UserGeoCoordinateRepository;
+import com.log.ingestion.log_ingestion_service.service.ApiKeyService;
+import com.log.ingestion.log_ingestion_service.service.external.ExternalRequestService;
 import com.log.ingestion.log_ingestion_service.util.LogConstants;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.json.simple.JSONObject;
-import org.springframework.beans.BeanUtils;
 import org.springframework.context.MessageSource;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
-import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.time.LocalTime;
-import java.time.ZoneId;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
@@ -40,13 +38,15 @@ public class AsyncServiceImplementation implements AsynchronousServices {
     private final ExternalRequestService externalRequestService;
     private final UserGeoCoordinateRepository geoCoordinateRepository;
     private final LogElasticRepository logElasticRepository;
+    private final ApiKeyService apiKeyService;
 
     private final Object geoLock = new Object();
 
     @Async
     @Override
-    public void saveUserGeoLocation(LogPrimeKey logPrimeKey, String clientIp) {
+    public void saveUserGeoLocation(LogPrimeKey logPrimeKey, String clientIp, String apiKey) {
         log.info("Entering in to save geo location service");
+        setTenant(apiKey);
         if (clientIp == null || clientIp.isEmpty()) {
             log.info("Returned because ip is null or blank");
             return;
@@ -76,6 +76,8 @@ public class AsyncServiceImplementation implements AsynchronousServices {
         } catch (Exception e) {
             log.info(LogConstants.ExceptionMsg.EXCEPTION_PREFIX, e.getMessage(), "saveGeoLocationDetails(LogPrimeKey logPrimeKey)");
             throw new LogCreationException("log.creation.failed.msg");
+        } finally {
+            TenantContext.currentTenant.remove();
         }
     }
 
@@ -107,15 +109,24 @@ public class AsyncServiceImplementation implements AsynchronousServices {
 
     @Async
     @Override
-    public void saveDataToElasticSearch(LogTrace logTrace) {
+    public void saveDataToElasticSearch(LogTrace logTrace, String apiKey) {
+        setTenant(apiKey);
         try {
             LogTraceDocument logDocument = buildLogTraceDocument(logTrace);
+            String currentTenant = TenantContext.currentTenant.get();
+            currentTenant = (currentTenant == null || currentTenant.isBlank()) ? apiKey : currentTenant;
+            logDocument.setTenantId(currentTenant);
             logElasticRepository.save(logDocument);
             log.info("Log document data saved successfully in elastic search...!");
         } catch (Exception ex) {
             log.error(LogConstants.ExceptionMsg.EXCEPTION_PREFIX, ex.getMessage(), "saveDataToElasticSearch(LogRequestDto logRequestDto)");
             throw ex;
         }
+    }
+
+    private void setTenant(String apiKey) {
+        UserApiKeyResponseDto apiKeyDetails = apiKeyService.getTenantDetails(apiKey);
+        TenantContext.currentTenant.set(apiKeyDetails.getTenantId());
     }
 
     public LogTraceDocument buildLogTraceDocument(LogTrace logRequest) {

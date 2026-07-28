@@ -1,5 +1,6 @@
 package com.log.ingestion.log_ingestion_service.service;
 
+import com.log.ingestion.log_ingestion_service.config.FeignClientService;
 import com.log.ingestion.log_ingestion_service.dto.*;
 import com.log.ingestion.log_ingestion_service.entity.*;
 import com.log.ingestion.log_ingestion_service.enums.Events;
@@ -8,8 +9,12 @@ import com.log.ingestion.log_ingestion_service.exception.DataFetchException;
 import com.log.ingestion.log_ingestion_service.exception.LogCreationException;
 import com.log.ingestion.log_ingestion_service.exception.SearchSpecException;
 import com.log.ingestion.log_ingestion_service.projections.*;
+import com.log.ingestion.log_ingestion_service.repository.ExceptionTraceRepository;
+import com.log.ingestion.log_ingestion_service.repository.HttpTraceRepository;
 import com.log.ingestion.log_ingestion_service.repository.LogTraceRepository;
 import com.log.ingestion.log_ingestion_service.repository.UserGeoCoordinateRepository;
+import com.log.ingestion.log_ingestion_service.service.asynchronous.AsynchronousServices;
+import com.log.ingestion.log_ingestion_service.service.dashboard.DashboardAnalyzerWithElasticService;
 import com.log.ingestion.log_ingestion_service.specification.LogInventorySpecService;
 import com.log.ingestion.log_ingestion_service.util.LogConstants;
 import com.log.ingestion.log_ingestion_service.validators.RequestConditionalValidatorService;
@@ -44,6 +49,9 @@ public class LogTraceServiceImplementation implements LogTraceService {
     private final AsynchronousServices asynchronousService;
     private final UserGeoCoordinateRepository geoCoordinateRepository;
     private final DashboardAnalyzerWithElasticService analyzerService;
+    private final FeignClientService feignClientService;
+    private final HttpTraceRepository httpTraceRepository;
+    private final ExceptionTraceRepository exceptionTraceRepository;
 
     @Value("${initial.analyze.data.fetch.limit}")
     private Integer fetchLimit;
@@ -87,14 +95,16 @@ public class LogTraceServiceImplementation implements LogTraceService {
                     .build();
             LogTrace logTrace = new LogTrace();
             BeanUtils.copyProperties(logRequestDto, logTrace);
-            logTrace.setExceptionTrace(exceptionTrace);
-            logTrace.setHttpTrace(httpTrace);
             logTrace.setMetaDataTrace(metaDataTrace);
             logTrace.setLogPrimaryKey(logPrimeKey);
             logTrace.setIncomingTime(LocalTime.now());
+            ExceptionTrace savedExceptionEntity = exceptionTraceRepository.saveAndFlush(exceptionTrace);
+            HttpTrace savedHttpEntity = httpTraceRepository.saveAndFlush(httpTrace);
+            logTrace.setHttpTrace(savedHttpEntity);
+            logTrace.setExceptionTrace(savedExceptionEntity);
             logTraceRepository.save(logTrace);
-            asynchronousService.saveUserGeoLocation(logPrimeKey, logRequestDto.getClientIp());
-            asynchronousService.saveDataToElasticSearch(logTrace);
+            asynchronousService.saveUserGeoLocation(logPrimeKey, logRequestDto.getClientIp(), logRequestDto.getApiKey());
+            asynchronousService.saveDataToElasticSearch(logTrace, logRequestDto.getApiKey());
             return ServiceResponse.builder()
                     .error(false)
                     .message("Log saved successfully !")
@@ -236,26 +246,6 @@ public class LogTraceServiceImplementation implements LogTraceService {
     @Override
     public SearchResponse getAllCardData() {
         try {
-            /*long totalDataCount = analyzerService.getDataCount();
-            double successRate = analyzerService.getSuccessRateInRequests();
-            double averageDuration = analyzerService.getAvgResponseTimeOfApplication();
-
-            JSONObject response = new JSONObject();
-            JSONObject requestPerformance = new JSONObject();
-            requestPerformance.put("averageDurationMs", averageDuration);
-            requestPerformance.put("successRate", successRate);
-            response.put("totalDataCount", totalDataCount);
-
-            JSONObject eventTypeDataCount = analyzerService.getTotalRequestCountByEventType();
-            JSONObject statusTypeDataCount = analyzerService.getStatusTypeCount();
-            JSONObject levelTypeDataCount = analyzerService.getLevelTypeCount();
-
-            List<JSONObject> responseList = new ArrayList<>();
-            response.put("data", responseList);
-            response.put("httpStatusMetaData", statusTypeDataCount);
-            response.put("eventTypeMetaData", eventTypeDataCount);
-            response.put("levelMetaData", levelTypeDataCount);
-            response.put("requestStates", requestPerformance);*/
             DashboardAnalyticsDto analyzedData = analyzerService.getDashBoardAnalytics();
             JSONObject response = new JSONObject();
             response.put("analyzedData", analyzedData);
