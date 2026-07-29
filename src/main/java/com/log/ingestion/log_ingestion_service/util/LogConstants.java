@@ -11,4 +11,8 @@ public class LogConstants {
     public static class SCHEMAS {
         public static final String DEFAULT_SCHEMA = "public";
     }
+
+    public static class CustomHeader {
+        public static final String X_ACCESS_KEY = "x-access-key";
+    }
 }
