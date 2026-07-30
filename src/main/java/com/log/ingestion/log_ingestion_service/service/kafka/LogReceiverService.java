@@ -1,4 +1,4 @@
-package com.log.ingestion.log_ingestion_service.service.listener;
+package com.log.ingestion.log_ingestion_service.service.kafka;
 
 import com.log.ingestion.log_ingestion_service.config.TenantContext;
 import com.log.ingestion.log_ingestion_service.dto.LogRequestDto;

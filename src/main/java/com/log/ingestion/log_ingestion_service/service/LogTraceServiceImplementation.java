@@ -15,6 +15,7 @@ import com.log.ingestion.log_ingestion_service.repository.LogTraceRepository;
 import com.log.ingestion.log_ingestion_service.repository.UserGeoCoordinateRepository;
 import com.log.ingestion.log_ingestion_service.service.asynchronous.AsynchronousServices;
 import com.log.ingestion.log_ingestion_service.service.dashboard.DashboardAnalyzerWithElasticService;
+import com.log.ingestion.log_ingestion_service.service.kafka.KafkaProducerService;
 import com.log.ingestion.log_ingestion_service.specification.LogInventorySpecService;
 import com.log.ingestion.log_ingestion_service.util.LogConstants;
 import com.log.ingestion.log_ingestion_service.validators.RequestConditionalValidatorService;
@@ -28,10 +29,12 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
+import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.sql.Timestamp;
 import java.time.*;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
@@ -49,9 +52,9 @@ public class LogTraceServiceImplementation implements LogTraceService {
     private final AsynchronousServices asynchronousService;
     private final UserGeoCoordinateRepository geoCoordinateRepository;
     private final DashboardAnalyzerWithElasticService analyzerService;
-    private final FeignClientService feignClientService;
     private final HttpTraceRepository httpTraceRepository;
     private final ExceptionTraceRepository exceptionTraceRepository;
+    private final KafkaProducerService kafkaProducerService;
 
     @Value("${initial.analyze.data.fetch.limit}")
     private Integer fetchLimit;
@@ -105,6 +108,7 @@ public class LogTraceServiceImplementation implements LogTraceService {
             logTraceRepository.save(logTrace);
             asynchronousService.saveUserGeoLocation(logPrimeKey, logRequestDto.getClientIp(), logRequestDto.getApiKey());
             asynchronousService.saveDataToElasticSearch(logTrace, logRequestDto.getApiKey());
+            kafkaProducerService.sendNotification(logRequestDto);
             return ServiceResponse.builder()
                     .error(false)
                     .message("Log saved successfully !")

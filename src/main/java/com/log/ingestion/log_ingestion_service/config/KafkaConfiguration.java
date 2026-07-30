@@ -28,10 +28,19 @@ public class KafkaConfiguration {
     @Value("${spring.kafka.bootstrap-servers}")
     private String kafkaUrl;
 
-    @Bean
+    @Bean(name = "dlt-kafka-topic")
     public NewTopic logIngestionDlt() {
         return TopicBuilder
                 .name("LogIngestion-dlt")
+                .partitions(3)
+                .replicas(1)
+                .build();
+    }
+
+    @Bean(name = "notification-topic")
+    public NewTopic notificationTopic() {
+        return TopicBuilder
+                .name("trace-notification")
                 .partitions(3)
                 .replicas(1)
                 .build();
@@ -67,7 +76,7 @@ public class KafkaConfiguration {
     }
 
     @Bean
-    public DefaultErrorHandler errorHandler(KafkaTemplate<String, LogRequestDto> kafkaTemplate) {
+    public DefaultErrorHandler errorHandler(KafkaTemplate<String, Object> kafkaTemplate) {
 
         DeadLetterPublishingRecoverer recover = new DeadLetterPublishingRecoverer(kafkaTemplate);
         FixedBackOff backOff = new FixedBackOff(2000, 3);
@@ -76,12 +85,12 @@ public class KafkaConfiguration {
     }
 
     @Bean
-    public KafkaTemplate<String, LogRequestDto> kafkaTemplate() {
+    public KafkaTemplate<String, Object> kafkaTemplate() {
         return new KafkaTemplate<>(producerFactory());
     }
 
     @Bean
-    public ProducerFactory<String, LogRequestDto> producerFactory() {
+    public ProducerFactory<String, Object> producerFactory() {
         Map<String, Object> config = new HashMap<>();
         config.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, kafkaUrl);
         config.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
