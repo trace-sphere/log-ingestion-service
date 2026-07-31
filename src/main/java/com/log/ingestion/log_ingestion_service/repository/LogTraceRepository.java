@@ -18,11 +18,11 @@ public interface LogTraceRepository extends JpaRepository<LogTrace, LogPrimeKey>
     @Query(value = "Select DISTINCT t.service_name, h.method, h.status, t.level, t.event_type from log_trace t Left Join http_trace h  on t.trace_id=h.trace_id", nativeQuery = true)
     List<DropdownData> findAllDropDownPopulateData();
 
-    @Query(value = "select COUNT(ht.client_ip) as ip_count, ht.client_ip  from public.http_trace ht GROUP BY ht.client_ip order by ip_count desc limit :dataCount", nativeQuery = true)
+    @Query(value = "select COUNT(ht.client_ip) as ip_count, ht.client_ip  from http_trace ht GROUP BY ht.client_ip order by ip_count desc limit :dataCount", nativeQuery = true)
     List<TopClientIps> findTopClientIp(@Param("dataCount") Integer amountOfData);
 
 
-    @Query(value = "select extract(hour from lt.incoming_time) as hours, COUNT(*) as request_count from public.log_trace lt group by extract(hour from lt.incoming_time) order by request_count desc limit 1", nativeQuery = true)
+    @Query(value = "select extract(hour from lt.incoming_time) as hours, COUNT(*) as request_count from log_trace lt group by extract(hour from lt.incoming_time) order by request_count desc limit 1", nativeQuery = true)
     List<PeakTrafficHours> peakTopFiveTrafficHours(Integer peakHoursFetchLimit);
 
 
