@@ -18,4 +18,6 @@ public interface DashboardAnalyzerWithElasticService {
 
     public SearchResponse getAll();
 
+    public SearchResponse searchByApiPathStackTraceExceptionType(String searchKeyWord);
+
 }

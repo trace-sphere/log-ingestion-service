@@ -36,4 +36,10 @@ public class ElasticController {
         return new ResponseEntity<>(response, HttpStatus.OK);
     }
 
+    @GetMapping("/globalSearchEvent")
+    public ResponseEntity<SearchResponse> globalSearch(@RequestParam String keyWord){
+        SearchResponse response = analyzerService.searchByApiPathStackTraceExceptionType(keyWord);
+        return new ResponseEntity<>(response, HttpStatus.OK);
+    }
+
 }

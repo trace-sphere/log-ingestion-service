@@ -22,6 +22,7 @@ import org.springframework.context.MessageSource;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.List;
 import java.util.Locale;
@@ -147,7 +148,7 @@ public class AsyncServiceImplementation implements AsynchronousServices {
                     .instanceId(logRequest.getInstanceId())
                     .logger(logRequest.getLogger())
                     .serviceName(logRequest.getServiceName())
-                    .timeStamp(logRequest.getExceptionTrace().getTimeStamp() == null ? null : logRequest.getExceptionTrace().getTimeStamp().toLocalDateTime())
+                    .timeStamp(logRequest.getLogPrimaryKey().getTimeStamp() == null ? null : LocalDateTime.from(logRequest.getLogPrimaryKey().getTimeStamp()))
                     .clientIp(blankToNull(logRequest.getHttpTrace().getClientIp()))
                     .method(blankToNull(logRequest.getHttpTrace().getMethod()))
                     .status(blankToNull(logRequest.getHttpTrace().getStatus()))

@@ -5,6 +5,7 @@ import co.elastic.clients.elasticsearch._types.aggregations.Aggregation;
 import co.elastic.clients.elasticsearch._types.aggregations.MultiBucketBase;
 import com.log.ingestion.log_ingestion_service.document.LogTraceDocument;
 import com.log.ingestion.log_ingestion_service.dto.DashboardAnalyticsDto;
+import com.log.ingestion.log_ingestion_service.dto.GlobalSearchResponse;
 import com.log.ingestion.log_ingestion_service.dto.SearchResponse;
 import com.log.ingestion.log_ingestion_service.dto.ServiceResponse;
 import com.log.ingestion.log_ingestion_service.enums.Events;
@@ -21,7 +22,11 @@ import org.springframework.data.elasticsearch.client.elc.ElasticsearchAggregatio
 import org.springframework.data.elasticsearch.client.elc.NativeQuery;
 import org.springframework.data.elasticsearch.core.ElasticsearchOperations;
 import org.springframework.data.elasticsearch.core.SearchHits;
+import org.springframework.data.elasticsearch.core.query.FetchSourceFilter;
+import org.springframework.data.elasticsearch.core.query.HighlightQuery;
 import org.springframework.data.elasticsearch.core.query.Query;
+import org.springframework.data.elasticsearch.core.query.highlight.Highlight;
+import org.springframework.data.elasticsearch.core.query.highlight.HighlightField;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -103,7 +108,7 @@ public class DashboardAnalyzerServiceImpl implements DashboardAnalyzerWithElasti
             final String tenantId = tenantResolverService.getCurrentTenant();
             Query query = NativeQuery.builder().withQuery(with -> with
                             .term(ter -> ter
-                                    .field("tenantId.keyword")
+                                    .field("tenantId")
                                     .value(tenantId)))
                     .withMaxResults(0)
 
@@ -209,5 +214,66 @@ public class DashboardAnalyzerServiceImpl implements DashboardAnalyzerWithElasti
                         bucket -> bucket.key().stringValue(),
                         MultiBucketBase::docCount
                 ));
+    }
+
+    @Override
+    public SearchResponse searchByApiPathStackTraceExceptionType(String searchKeyWord) {
+        try {
+            log.info("Entering into Search By Api Path Stack Trace Exception Type");
+            Highlight highlight = new Highlight(
+                    List.of(
+                            new HighlightField("message"),
+                            new HighlightField("exceptionClass"),
+                            new HighlightField("stackTrace"),
+                            new HighlightField("path"),
+                            new HighlightField("logger")
+                    ));
+            HighlightQuery highlightQuery = new HighlightQuery(highlight, LogTraceDocument.class);
+            Query nativeQuery = NativeQuery.builder()
+                    .withQuery(query -> query
+                            .bool(bool -> bool
+                                    .should(should -> should
+                                            .multiMatch(multi -> multi
+                                                    .fields("message", "exceptionClass", "path", "logger")
+                                                    .query(searchKeyWord)
+                                                    .fuzziness("AUTO")))
+                                    .should(should -> should
+                                            .wildcard(wild -> wild
+                                                    .field("stackTrace")
+                                                    .value("*" + searchKeyWord + "*")
+                                                    .caseInsensitive(true)))
+                            )).withSourceFilter(new FetchSourceFilter(
+                                    true,
+                            new String[]{"logId", "timeStamp", "traceId", "exceptionClass", "stackTrace", "path", "logger", "message"}, null))
+                    .withHighlightQuery(highlightQuery)
+                    .build();
+            SearchHits<LogTraceDocument> searchHits = elasticOperations.search(nativeQuery, LogTraceDocument.class);
+            List<GlobalSearchResponse> globalSearchMetaData = searchHits.stream().map(hit -> {
+                Map<String, List<String>> highLightedFields = hit.getHighlightFields();
+                LogTraceDocument logTraceDocument = hit.getContent();
+                return GlobalSearchResponse.builder()
+                        .path(logTraceDocument.getPath())
+                        .traceId(logTraceDocument.getTraceId())
+                        .logId(logTraceDocument.getLogId())
+                        .stackTrace(logTraceDocument.getStackTrace())
+                        .exceptionClass(logTraceDocument.getExceptionClass())
+                        .message(logTraceDocument.getMessage())
+                        .timeStamp(Objects.toString(logTraceDocument.getTimeStamp(), ""))
+                        .logger(logTraceDocument.getLogger())
+                        .highLights(highLightedFields)
+                        .build();
+            }).toList();
+            JSONObject response = new JSONObject();
+            response.put("searchResult", globalSearchMetaData);
+            log.info("Leaving from Search By Api Path Stack Trace Exception Type");
+            return SearchResponse.builder()
+                    .error(false)
+                    .message(messageSource.getMessage("dashboard.global.search.success", null, Locale.ENGLISH))
+                    .results(response)
+                    .build();
+        } catch (Exception e) {
+            log.error(LogConstants.ExceptionMsg.EXCEPTION_PREFIX, e.getMessage(), "searchByApiPathStackTraceExceptionType()");
+            throw new ElasticOperationException("dashboard.global.search.failed");
+        }
     }
 }
