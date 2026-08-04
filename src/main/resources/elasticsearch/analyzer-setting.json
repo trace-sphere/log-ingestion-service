@@ -1,0 +1,26 @@
+{
+  "analysis": {
+    "filter": {
+      "stacktrace_word_delimiter": {
+        "type": "word_delimiter_graph",
+        "split_on_case_change": true,
+        "split_on_numerics": true,
+        "generate_word_parts": true,
+        "generate_number_parts": true,
+        "catenate_words": true,
+        "catenate_numbers": true,
+        "preserve_original": true
+      }
+    },
+    "analyzer": {
+      "stacktrace_analyzer": {
+        "type": "custom",
+        "tokenizer": "keyword",
+        "filter": [
+          "stacktrace_word_delimiter",
+          "lowercase"
+        ]
+      }
+    }
+  }
+}
