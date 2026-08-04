@@ -3,10 +3,7 @@ package com.log.ingestion.log_ingestion_service.document;
 
 import lombok.*;
 import org.springframework.data.annotation.Id;
-import org.springframework.data.elasticsearch.annotations.DateFormat;
-import org.springframework.data.elasticsearch.annotations.Document;
-import org.springframework.data.elasticsearch.annotations.Field;
-import org.springframework.data.elasticsearch.annotations.FieldType;
+import org.springframework.data.elasticsearch.annotations.*;
 
 import java.time.LocalDateTime;
 import java.time.LocalTime;
@@ -19,6 +16,7 @@ import java.time.LocalTime;
 @Builder(toBuilder = true)
 @EqualsAndHashCode
 @Document(indexName = "log_trace_document")
+@Setting(settingPath = "/elasticsearch/analyzer-setting.json")
 public class LogTraceDocument {
 
     @Field(type = FieldType.Keyword)
@@ -26,6 +24,8 @@ public class LogTraceDocument {
     @Field(type = FieldType.Keyword)
     @Id
     private String traceId;
+    @Field(type = FieldType.Keyword)
+    private String logId;
     @Field(type = FieldType.Keyword)
     private String serviceName;
     @Field(type = FieldType.Keyword)
@@ -52,7 +52,7 @@ public class LogTraceDocument {
     private String exceptionClass;
     @Field(type = FieldType.Text)
     private String exceptionMessage;
-    @Field(type = FieldType.Text)
+    @Field(type = FieldType.Text, analyzer = "stacktrace_analyzer")
     private String stackTrace;
     @Field(type = FieldType.Date)
     private LocalDateTime timeStamp;
