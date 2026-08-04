@@ -249,10 +249,12 @@ public class LogTraceServiceImplementation implements LogTraceService {
     @SuppressWarnings("unchecked")
     @Override
     public SearchResponse getAllCardData() {
+        log.info("Entering into get card data");
         try {
             DashboardAnalyticsDto analyzedData = analyzerService.getDashBoardAnalytics();
             JSONObject response = new JSONObject();
             response.put("analyzedData", analyzedData);
+            log.info("Leaving from get card data");
             return new SearchResponse().toBuilder()
                     .error(false)
                     .message(messageSource.getMessage("log.search.success.msg", null, Locale.ENGLISH))
