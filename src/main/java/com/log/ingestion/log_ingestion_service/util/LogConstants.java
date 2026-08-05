@@ -7,6 +7,7 @@ public class LogConstants {
 
     public static class ExceptionMsg {
         public static final String EXCEPTION_PREFIX = "Exception occurred for message: {} at method {}";
+        public static final String PREFIX = "Exception occurred for message: {} at {}";
     }
 
     public static class SCHEMAS {

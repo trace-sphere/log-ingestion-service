@@ -29,6 +29,10 @@ import org.springframework.data.elasticsearch.core.query.highlight.Highlight;
 import org.springframework.data.elasticsearch.core.query.highlight.HighlightField;
 import org.springframework.stereotype.Service;
 
+import java.beans.IntrospectionException;
+import java.beans.PropertyDescriptor;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.*;
@@ -243,12 +247,12 @@ public class DashboardAnalyzerServiceImpl implements DashboardAnalyzerWithElasti
                                                     .value("*" + searchKeyWord + "*")
                                                     .caseInsensitive(true)))
                             )).withSourceFilter(new FetchSourceFilter(
-                                    true,
+                            true,
                             new String[]{"logId", "timeStamp", "traceId", "exceptionClass", "stackTrace", "path", "logger", "message"}, null))
                     .withHighlightQuery(highlightQuery)
                     .build();
             SearchHits<LogTraceDocument> searchHits = elasticOperations.search(nativeQuery, LogTraceDocument.class);
-            List<GlobalSearchResponse> globalSearchMetaData = searchHits.stream().map(hit -> {
+            /*List<GlobalSearchResponse> globalSearchMetaData = searchHits.stream().map(hit -> {
                 Map<String, List<String>> highLightedFields = hit.getHighlightFields();
                 LogTraceDocument logTraceDocument = hit.getContent();
                 return GlobalSearchResponse.builder()
@@ -262,7 +266,24 @@ public class DashboardAnalyzerServiceImpl implements DashboardAnalyzerWithElasti
                         .logger(logTraceDocument.getLogger())
                         .highLights(highLightedFields)
                         .build();
-            }).toList();
+            }).toList();*/
+            List<GlobalSearchResponse> globalSearchMetaData = new ArrayList<>();
+            searchHits.stream().forEach(searchHit -> {
+                Map<String, List<String>> highLightedFields = searchHit.getHighlightFields();
+                LogTraceDocument logTraceDocument = searchHit.getContent();
+                globalSearchMetaData.addAll(highLightedFields.keySet().stream().map(map -> {
+                    GlobalSearchResponse globalSearchResponse =
+                            GlobalSearchResponse.builder().traceId(logTraceDocument.getTraceId()).build();
+                    try {
+                        return globalSearchResponse.toBuilder()
+                                .resultant(getFieldValue(map, logTraceDocument))
+                                .build();
+                    } catch (Exception e) {
+                        log.info(LogConstants.ExceptionMsg.PREFIX, e.getMessage(), "getFieldValue(map, new LogTraceDocument())");
+                        return globalSearchResponse;
+                    }
+                }).toList());
+            });
             JSONObject response = new JSONObject();
             response.put("searchResult", globalSearchMetaData);
             log.info("Leaving from Search By Api Path Stack Trace Exception Type");
@@ -275,5 +296,12 @@ public class DashboardAnalyzerServiceImpl implements DashboardAnalyzerWithElasti
             log.error(LogConstants.ExceptionMsg.EXCEPTION_PREFIX, e.getMessage(), "searchByApiPathStackTraceExceptionType()");
             throw new ElasticOperationException("dashboard.global.search.failed");
         }
+    }
+
+    private String getFieldValue(String fieldName, Object currentObject) throws IntrospectionException, InvocationTargetException, IllegalAccessException {
+        PropertyDescriptor propertyDescriptor = new PropertyDescriptor(fieldName, currentObject.getClass());
+        Method getter = propertyDescriptor.getReadMethod();
+        Object value = getter.invoke(currentObject);
+        return Objects.toString(value, "");
     }
 }

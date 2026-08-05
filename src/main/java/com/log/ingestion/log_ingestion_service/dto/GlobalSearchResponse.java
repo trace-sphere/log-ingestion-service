@@ -16,10 +16,5 @@ public class GlobalSearchResponse {
     private String logId;
     private String timeStamp;
     private String traceId;
-    private Map<String, List<String>> highLights;
-    private String message;
-    private String exceptionClass;
-    private String stackTrace;
-    private String path;
-    private String logger;
+    private String resultant;
 }

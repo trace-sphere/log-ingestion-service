@@ -61,6 +61,11 @@ public class LogInventorySpecificationImplementation implements LogInventorySpec
                 finalPredicate = criteriaBuilder.and(finalPredicate, criteriaBuilder.equal(root.get("httpTrace").get("durationMs"), duration));
             }
 
+            if(requestBody.getTraceId()!=null && !requestBody.getTraceId().isBlank()) {
+                String traceId = requestBody.getTraceId();
+                finalPredicate = criteriaBuilder.and(finalPredicate, criteriaBuilder.equal(root.get("id").get("traceId"), traceId));
+            }
+
             query.orderBy(criteriaBuilder.asc(root.get("httpTrace").get("durationMs")));
 
             return finalPredicate;

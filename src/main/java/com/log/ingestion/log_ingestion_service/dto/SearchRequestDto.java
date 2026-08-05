@@ -21,4 +21,5 @@ public class SearchRequestDto {
     private String level;
     private String firstTimeStamp;
     private String lastTimeStamp;
+    private String traceId;
 }
