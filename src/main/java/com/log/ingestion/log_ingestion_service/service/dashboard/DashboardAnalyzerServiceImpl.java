@@ -220,10 +220,20 @@ public class DashboardAnalyzerServiceImpl implements DashboardAnalyzerWithElasti
                 ));
     }
 
+    @SuppressWarnings("unchecked")
     @Override
     public SearchResponse searchByApiPathStackTraceExceptionType(String searchKeyWord) {
         try {
             log.info("Entering into Search By Api Path Stack Trace Exception Type");
+            if (searchKeyWord == null || searchKeyWord.isBlank()) {
+                JSONObject response = new JSONObject();
+                response.put("searchResult", Collections.emptyList());
+                return SearchResponse.builder()
+                        .error(false)
+                        .message(messageSource.getMessage("dashboard.global.search.success", null, Locale.ENGLISH))
+                        .results(response)
+                        .build();
+            }
             Highlight highlight = new Highlight(
                     List.of(
                             new HighlightField("message"),
@@ -252,21 +262,6 @@ public class DashboardAnalyzerServiceImpl implements DashboardAnalyzerWithElasti
                     .withHighlightQuery(highlightQuery)
                     .build();
             SearchHits<LogTraceDocument> searchHits = elasticOperations.search(nativeQuery, LogTraceDocument.class);
-            /*List<GlobalSearchResponse> globalSearchMetaData = searchHits.stream().map(hit -> {
-                Map<String, List<String>> highLightedFields = hit.getHighlightFields();
-                LogTraceDocument logTraceDocument = hit.getContent();
-                return GlobalSearchResponse.builder()
-                        .path(logTraceDocument.getPath())
-                        .traceId(logTraceDocument.getTraceId())
-                        .logId(logTraceDocument.getLogId())
-                        .stackTrace(logTraceDocument.getStackTrace())
-                        .exceptionClass(logTraceDocument.getExceptionClass())
-                        .message(logTraceDocument.getMessage())
-                        .timeStamp(Objects.toString(logTraceDocument.getTimeStamp(), ""))
-                        .logger(logTraceDocument.getLogger())
-                        .highLights(highLightedFields)
-                        .build();
-            }).toList();*/
             List<GlobalSearchResponse> globalSearchMetaData = new ArrayList<>();
             searchHits.stream().forEach(searchHit -> {
                 Map<String, List<String>> highLightedFields = searchHit.getHighlightFields();

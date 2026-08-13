@@ -24,6 +24,7 @@ import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
@@ -148,7 +149,7 @@ public class AsyncServiceImplementation implements AsynchronousServices {
                     .instanceId(logRequest.getInstanceId())
                     .logger(logRequest.getLogger())
                     .serviceName(logRequest.getServiceName())
-                    .timeStamp(logRequest.getLogPrimaryKey().getTimeStamp() == null ? null : LocalDateTime.from(logRequest.getLogPrimaryKey().getTimeStamp()))
+                    .timeStamp(logRequest.getLogPrimaryKey().getTimeStamp() == null ? null : LocalDateTime.ofInstant(logRequest.getLogPrimaryKey().getTimeStamp(), ZoneId.of("Asia/Kolkata")))
                     .clientIp(blankToNull(logRequest.getHttpTrace().getClientIp()))
                     .method(blankToNull(logRequest.getHttpTrace().getMethod()))
                     .status(blankToNull(logRequest.getHttpTrace().getStatus()))

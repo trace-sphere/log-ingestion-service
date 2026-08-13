@@ -19,7 +19,7 @@ public class WebSecurityConfig {
                 .requestMatchers("/logTrace/test/request").permitAll()
                 .requestMatchers("/logTrace/getBySearch").permitAll()
                 .requestMatchers("/dashboard/getAll").permitAll()
-                .anyRequest().permitAll());
+                .anyRequest().authenticated());
 
         httpSecurity.cors(AbstractHttpConfigurer::disable);
         httpSecurity.csrf(AbstractHttpConfigurer::disable);

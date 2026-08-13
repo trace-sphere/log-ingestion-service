@@ -1,6 +1,8 @@
 package com.log.ingestion.log_ingestion_service.service;
 
 import com.log.ingestion.log_ingestion_service.config.FeignClientService;
+import com.log.ingestion.log_ingestion_service.config.TenantContext;
+import com.log.ingestion.log_ingestion_service.config.UserNameContext;
 import com.log.ingestion.log_ingestion_service.dto.*;
 import com.log.ingestion.log_ingestion_service.entity.*;
 import com.log.ingestion.log_ingestion_service.enums.Events;
@@ -55,6 +57,7 @@ public class LogTraceServiceImplementation implements LogTraceService {
     private final HttpTraceRepository httpTraceRepository;
     private final ExceptionTraceRepository exceptionTraceRepository;
     private final KafkaProducerService kafkaProducerService;
+    private final ApiKeyService apiKeyService;
 
     @Value("${initial.analyze.data.fetch.limit}")
     private Integer fetchLimit;
@@ -64,6 +67,7 @@ public class LogTraceServiceImplementation implements LogTraceService {
 
     @Override
     public ServiceResponse saveLog(LogRequestDto logRequestDto) {
+        setTenant(logRequestDto.getApiKey());
         String traceId = UUID.randomUUID().toString();
         LogPrimeKey logPrimeKey = LogPrimeKey.builder()
                 .logId(UUID.randomUUID().toString())
@@ -101,13 +105,13 @@ public class LogTraceServiceImplementation implements LogTraceService {
             logTrace.setMetaDataTrace(metaDataTrace);
             logTrace.setLogPrimaryKey(logPrimeKey);
             logTrace.setIncomingTime(LocalTime.now());
-            ExceptionTrace savedExceptionEntity = exceptionTraceRepository.saveAndFlush(exceptionTrace);
-            HttpTrace savedHttpEntity = httpTraceRepository.saveAndFlush(httpTrace);
-            logTrace.setHttpTrace(savedHttpEntity);
-            logTrace.setExceptionTrace(savedExceptionEntity);
-            logTraceRepository.save(logTrace);
-            asynchronousService.saveUserGeoLocation(logPrimeKey, logRequestDto.getClientIp(), logRequestDto.getApiKey());
-            asynchronousService.saveDataToElasticSearch(logTrace, logRequestDto.getApiKey());
+            logTrace.setHttpTrace(httpTrace);
+            logTrace.setExceptionTrace(exceptionTrace);
+            LogTrace savedLogTrace = logTraceRepository.saveAndFlush(logTrace);
+            log.info(savedLogTrace.getLogPrimaryKey().toString());
+            asynchronousService.saveUserGeoLocation(
+                    savedLogTrace.getLogPrimaryKey(), logRequestDto.getClientIp(), logRequestDto.getApiKey());
+            asynchronousService.saveDataToElasticSearch(savedLogTrace, logRequestDto.getApiKey());
             kafkaProducerService.sendNotification(logRequestDto);
             return ServiceResponse.builder()
                     .error(false)
@@ -115,7 +119,7 @@ public class LogTraceServiceImplementation implements LogTraceService {
                     .details(List.of())
                     .build();
         } catch (ConditionalValidatorException e) {
-            log.info(LogConstants.ExceptionMsg.EXCEPTION_PREFIX + " method() saveLog->", e.toString());
+            log.info(LogConstants.ExceptionMsg.EXCEPTION_PREFIX, e.toString(), " method() saveLog->");
             throw new ConditionalValidatorException(e.getMessage());
         } catch (Exception e) {
             log.info("Failed for message: {}" + " method() saveLog->", e.getMessage());
@@ -543,5 +547,11 @@ public class LogTraceServiceImplementation implements LogTraceService {
             log.error(LogConstants.ExceptionMsg.EXCEPTION_PREFIX, e.getMessage(), "getTraceById(PrimaryKeyDto logPrimeKeyDto)");
             throw e;
         }
+    }
+
+    private void setTenant(String apiKey) {
+        UserApiKeyResponseDto apiKeyDetails = apiKeyService.getTenantDetails(apiKey);
+        TenantContext.currentTenant.set(apiKeyDetails.getTenantId());
+        UserNameContext.currentUser.set(apiKeyDetails.getUserName());
     }
 }

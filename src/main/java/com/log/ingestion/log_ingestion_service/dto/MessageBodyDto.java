@@ -10,6 +10,7 @@ import lombok.*;
 @Builder(toBuilder = true)
 @EqualsAndHashCode
 public class MessageBodyDto {
+    private String targetUser;
     private String message;
     private Long updatedDataCount;
     private String logType;
