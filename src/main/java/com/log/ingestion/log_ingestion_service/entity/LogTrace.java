@@ -2,6 +2,7 @@ package com.log.ingestion.log_ingestion_service.entity;
 
 import com.log.ingestion.log_ingestion_service.enums.Events;
 import com.log.ingestion.log_ingestion_service.enums.LogLevel;
+import com.log.ingestion.log_ingestion_service.enums.OperationStatus;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -38,6 +39,12 @@ public class LogTrace {
     private String message;
     private String spanId;
     private LocalTime incomingTime;
+
+    @Enumerated(EnumType.STRING)
+    private OperationStatus elasticOperationStatus;
+
+    @Enumerated(EnumType.STRING)
+    private OperationStatus geoLocationOperationStatus;
 
     @JoinColumn(name = "exception_trace_id")
     @OneToOne(cascade = CascadeType.ALL)

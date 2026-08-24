@@ -1,16 +1,18 @@
 package com.log.ingestion.log_ingestion_service.repository;
 
+import com.log.ingestion.log_ingestion_service.enums.OperationStatus;
 import com.log.ingestion.log_ingestion_service.projections.*;
 import com.log.ingestion.log_ingestion_service.entity.LogPrimeKey;
 import com.log.ingestion.log_ingestion_service.entity.LogTrace;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
-import java.util.Objects;
 
 @Repository
 public interface LogTraceRepository extends JpaRepository<LogTrace, LogPrimeKey>, JpaSpecificationExecutor<LogTrace> {
@@ -32,9 +34,16 @@ public interface LogTraceRepository extends JpaRepository<LogTrace, LogPrimeKey>
     @Query(value = "select count(ht.path) as no_of_hits,round(avg(ht.duration_ms)) as avg_response_time, ht.path, ht.method  from http_trace ht where ht.path is not null and ht.path!='' group by ht.path, ht.method order by no_of_hits desc limit :dataFetchLimit", nativeQuery = true)
     List<TopTenMostHittingApi> getTopHittingApisWithAvgResponseTime(Integer dataFetchLimit);
 
-//    @Query(value = "select count(ht.path) as hitting_time, lt.service_name from http_trace ht left join log_trace lt on ht.http_id = lt.http_trace_id  group by lt.service_name order by hitting_time desc limit :fetchLimit", nativeQuery = true)
-//    List<FrequentlyHitServices> getFrequentlyHitService(Integer fetchLimit);
-
     @Query(value = "select count(ht.path) as no_of_hit,round(avg(ht.duration_ms)) as avg_response_time, lt.service_name from http_trace ht left join log_trace lt on ht.http_id = lt.http_trace_id where ht.duration_ms is not null group by lt.service_name order by no_of_hit desc", nativeQuery = true)
     List<AvgResponseByService> getResponseTimeByAndNoOfHitPerService();
+
+    @Transactional
+    @Modifying
+    @Query(value = "update log_trace set geo_location_operation_status = :status where trace_id = :traceId", nativeQuery = true)
+    public int updateTraceGeoLocationStatus(@Param("traceId") String traceId, @Param("status") String operation_status);
+
+    @Transactional
+    @Modifying
+    @Query(value = "update log_trace set elastic_operation_status = :status where trace_id = :traceId", nativeQuery = true)
+    public int updateElasticOperationStatus(@Param("traceId") String traceId, @Param("status") String operation_status);
 }

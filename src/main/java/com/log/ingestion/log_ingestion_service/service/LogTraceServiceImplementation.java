@@ -1,18 +1,16 @@
 package com.log.ingestion.log_ingestion_service.service;
 
-import com.log.ingestion.log_ingestion_service.config.FeignClientService;
 import com.log.ingestion.log_ingestion_service.config.TenantContext;
 import com.log.ingestion.log_ingestion_service.config.UserNameContext;
 import com.log.ingestion.log_ingestion_service.dto.*;
 import com.log.ingestion.log_ingestion_service.entity.*;
 import com.log.ingestion.log_ingestion_service.enums.Events;
+import com.log.ingestion.log_ingestion_service.enums.OperationStatus;
 import com.log.ingestion.log_ingestion_service.exception.ConditionalValidatorException;
 import com.log.ingestion.log_ingestion_service.exception.DataFetchException;
 import com.log.ingestion.log_ingestion_service.exception.LogCreationException;
 import com.log.ingestion.log_ingestion_service.exception.SearchSpecException;
 import com.log.ingestion.log_ingestion_service.projections.*;
-import com.log.ingestion.log_ingestion_service.repository.ExceptionTraceRepository;
-import com.log.ingestion.log_ingestion_service.repository.HttpTraceRepository;
 import com.log.ingestion.log_ingestion_service.repository.LogTraceRepository;
 import com.log.ingestion.log_ingestion_service.repository.UserGeoCoordinateRepository;
 import com.log.ingestion.log_ingestion_service.service.asynchronous.AsynchronousServices;
@@ -31,12 +29,10 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
-import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
-import java.sql.Timestamp;
 import java.time.*;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
@@ -54,8 +50,6 @@ public class LogTraceServiceImplementation implements LogTraceService {
     private final AsynchronousServices asynchronousService;
     private final UserGeoCoordinateRepository geoCoordinateRepository;
     private final DashboardAnalyzerWithElasticService analyzerService;
-    private final HttpTraceRepository httpTraceRepository;
-    private final ExceptionTraceRepository exceptionTraceRepository;
     private final KafkaProducerService kafkaProducerService;
     private final ApiKeyService apiKeyService;
 
@@ -67,8 +61,9 @@ public class LogTraceServiceImplementation implements LogTraceService {
 
     @Override
     public ServiceResponse saveLog(LogRequestDto logRequestDto) {
-        setTenant(logRequestDto.getApiKey());
         String traceId = UUID.randomUUID().toString();
+        logRequestDto.setTraceId(traceId);
+        setTenant(logRequestDto.getApiKey());
         LogPrimeKey logPrimeKey = LogPrimeKey.builder()
                 .logId(UUID.randomUUID().toString())
                 .traceId(traceId)
@@ -107,8 +102,9 @@ public class LogTraceServiceImplementation implements LogTraceService {
             logTrace.setIncomingTime(LocalTime.now());
             logTrace.setHttpTrace(httpTrace);
             logTrace.setExceptionTrace(exceptionTrace);
+            logTrace.setElasticOperationStatus(OperationStatus.PENDING);
+            logTrace.setGeoLocationOperationStatus(OperationStatus.PENDING);
             LogTrace savedLogTrace = logTraceRepository.saveAndFlush(logTrace);
-            log.info(savedLogTrace.getLogPrimaryKey().toString());
             asynchronousService.saveUserGeoLocation(
                     savedLogTrace.getLogPrimaryKey(), logRequestDto.getClientIp(), logRequestDto.getApiKey());
             asynchronousService.saveDataToElasticSearch(savedLogTrace, logRequestDto.getApiKey());
@@ -123,6 +119,7 @@ public class LogTraceServiceImplementation implements LogTraceService {
             throw new ConditionalValidatorException(e.getMessage());
         } catch (Exception e) {
             log.info("Failed for message: {}" + " method() saveLog->", e.getMessage());
+            asynchronousService.takeBackUpWithRollBack(logRequestDto);
             throw new LogCreationException("log.creation.failed.msg");
         }
     }
