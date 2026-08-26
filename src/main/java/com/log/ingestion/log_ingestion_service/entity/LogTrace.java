@@ -54,10 +54,6 @@ public class LogTrace {
     @OneToOne(cascade = CascadeType.ALL)
     private HttpTrace httpTrace;
 
-    @JoinColumn(name = "coordinate_trace_id")
-    @OneToOne(cascade = CascadeType.ALL)
-    private UserGeoCoordinate userGeoCoordinate;
-
     @Embedded
     @Column(columnDefinition = "jsonb")
     private MetaDataTrace metaDataTrace;

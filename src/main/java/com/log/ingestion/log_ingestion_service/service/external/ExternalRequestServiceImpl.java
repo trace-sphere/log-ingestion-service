@@ -25,16 +25,20 @@ public class ExternalRequestServiceImpl implements ExternalRequestService {
 
     @Override
     public JSONObject getUserIpDetails(String clientIp) {
-        try{
+        JSONObject response = new JSONObject();
+        try {
             String ipStackUri = UriComponentsBuilder
                     .fromUriString(ipStackUriBaseUri)
                     .queryParam("access_key", ipStackAccessKey)
                     .buildAndExpand(clientIp).toUriString();
-            JSONObject response = restTemplate.getForObject(ipStackUri, JSONObject.class);
+            response = restTemplate.getForObject(ipStackUri, JSONObject.class);
+            response.put("error", false);
             return response;
         } catch (Exception ex) {
             log.error(LogConstants.ExceptionMsg.EXCEPTION_PREFIX, ex, "getUserIpDetails(?)");
-            throw new ExternalApiRequestException("abstract.error.details");
         }
+        response.put("client_ip", clientIp);
+        response.put("error", true);
+        return response;
     }
 }

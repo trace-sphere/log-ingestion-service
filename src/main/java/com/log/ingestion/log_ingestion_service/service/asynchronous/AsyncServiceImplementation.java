@@ -37,6 +37,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
 
 @Slf4j
 @RequiredArgsConstructor
@@ -51,12 +52,12 @@ public class AsyncServiceImplementation implements AsynchronousServices {
     private final ApiKeyService apiKeyService;
     private final LogBackUpRepository logBackUpRepository;
     private final HandelFailedTransactionAndStatus handelFailedTransactionAndStatus;
-
-    private final Object geoLock = new Object();
+    private final ConcurrentHashMap<String, Object> perIpLock = new ConcurrentHashMap<>();
 
     @Async
     @Override
-    public void saveUserGeoLocation(LogPrimeKey logPrimeKey, String clientIp, String apiKey) {
+    public void saveUserGeoLocation(final LogPrimeKey logPrimeKey, final String clientIp, final String apiKey) {
+        final Object geoLock = perIpLock.computeIfAbsent(clientIp, key -> new Object());
         log.info("Entering in to save geo location service");
         setTenant(apiKey);
         if (apiKey == null || apiKey.isBlank()) {
@@ -73,45 +74,50 @@ public class AsyncServiceImplementation implements AsynchronousServices {
             throw new LogCreationException("geo.location.failed.msg");
         }
         LogTrace logTrace = logTraceOptional.get();
-        if(!logTrace.getGeoLocationOperationStatus().equals(OperationStatus.PENDING)) {
+        if (!logTrace.getGeoLocationOperationStatus().equals(OperationStatus.PENDING)) {
             log.info("geo location already processing or complete");
             throw new LogCreationException("geo.location.failed.msg");
         }
         try {
+            final String traceId = logTrace.getLogPrimaryKey().getTraceId();
             synchronized (geoLock) {
                 List<UserGeoCoordinate> geoCoordinateList = geoCoordinateRepository.findByClientIp(clientIp);
                 if (!geoCoordinateList.isEmpty()) {
                     int rowCount = geoCoordinateRepository.increaseTrafficCountInUserGeoCoordinate(clientIp);
                     if (rowCount > 0) {
                         log.info("Traffic count recorded");
-                        logTraceRepository
-                                .updateTraceGeoLocationStatus(
-                                        logTrace.getLogPrimaryKey().getTraceId(), LogConstants.STATUS.COMPLETE);
+                        logTraceRepository.updateTraceGeoLocationStatus(traceId, LogConstants.STATUS.COMPLETE);
                         return;
                     }
                 }
-                UserGeoCoordinate userGeoCoordinate = buildUserGeoCoordinate(clientIp);
+                UserGeoCoordinate userGeoCoordinate = buildUserGeoCoordinate(clientIp, traceId);
                 userGeoCoordinate.setTraceId(logPrimeKey.getTraceId());
-                logTrace.setUserGeoCoordinate(userGeoCoordinate);
-                logTraceRepository.save(logTrace);
+                userGeoCoordinate.setTrafficCount(1L);
+                geoCoordinateRepository.saveAndFlush(userGeoCoordinate);
             }
             logTraceRepository
                     .updateTraceGeoLocationStatus(logTrace.getLogPrimaryKey().getTraceId(), LogConstants.STATUS.COMPLETE);
             log.info("Log details with geo location data saved successfully");
+        } catch (LogCreationException ex) {
+            log.error(LogConstants.ExceptionMsg.EXCEPTION_PREFIX, ex.getMessage(), "saveGeoLocationDetails(LogPrimeKey logPrimeKey)");
         } catch (Exception e) {
-            log.info(LogConstants.ExceptionMsg.EXCEPTION_PREFIX, e.getMessage(), "saveGeoLocationDetails(LogPrimeKey logPrimeKey)");
-            throw new LogCreationException("log.creation.failed.msg");
+            log.error(LogConstants.ExceptionMsg.EXCEPTION_PREFIX, e.getMessage(), "saveGeoLocationDetails(LogPrimeKey logPrimeKey)");
+            throw e;
         } finally {
             TenantContext.currentTenant.remove();
         }
     }
 
-    private UserGeoCoordinate buildUserGeoCoordinate(String clientIp) {
+    private UserGeoCoordinate buildUserGeoCoordinate(final String clientIp, final String traceId) {
         log.info("Entering in to buildUserGeoCoordinate() method");
         try {
             JSONObject ipStackResponse = externalRequestService.getUserIpDetails(clientIp);
             ObjectMapper mapper = new ObjectMapper();
             JSONObject timeZone = mapper.convertValue(ipStackResponse.get("time_zone"), JSONObject.class);
+            if (Boolean.TRUE.equals(ipStackResponse.get("error"))) {
+                handelFailedTransactionAndStatus.updateFailedStatusForGeoLocation(traceId);
+                throw new LogCreationException("Geo Ip coordinate service down");
+            }
             log.info("Leaving from buildUserGeoCoordinate() method");
             return UserGeoCoordinate.builder()
                     .clientIp(clientIp)
@@ -124,11 +130,13 @@ public class AsyncServiceImplementation implements AsynchronousServices {
                     .latitude(String.valueOf(ipStackResponse.get("latitude")))
                     .longitude(String.valueOf(ipStackResponse.get("longitude")))
                     .zipCode(String.valueOf(ipStackResponse.get("zip")))
-                    .timeZone(String.valueOf(timeZone.get("id")))
+                    .timeZone(String.valueOf(timeZone != null ? timeZone.get("id") : "universal"))
                     .build();
+        } catch (LogCreationException ex) {
+            throw new LogCreationException(ex.getMessage());
         } catch (Exception e) {
             log.error(LogConstants.ExceptionMsg.EXCEPTION_PREFIX, e, "buildUserGeoCoordinate(?)");
-            throw new SearchSpecException("log.creation.failed.msg");
+            throw e;
         }
     }
 
