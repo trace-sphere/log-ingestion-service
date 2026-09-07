@@ -546,7 +546,105 @@ public class LogTraceServiceImplementation implements LogTraceService {
         }
     }
 
+
+    @Override
+    public FailedJobResponse getFirstHundredGeoLocationFailedJob(String apiKey) {
+        System.out.println("___________ controller"+ apiKey);
+        setTenant(apiKey);
+        try {
+            List<LogTrace> failedGeoLocationTrace = logTraceRepository.getFirstHundredGeoLocationAccordingToStatus(OperationStatus.FAILED.toString());
+            if (failedGeoLocationTrace.isEmpty()) {
+                return FailedJobResponse.builder()
+                        .error(false)
+                        .result(Collections.emptyList())
+                        .build();
+            }
+            ArrayList<LogRequestDto> logTraceList = new ArrayList<>();
+            for (LogTrace logTrace : failedGeoLocationTrace) {
+                LogRequestDto logRequestDto = buildLogRequestDtoFromLogTrace(logTrace);
+                logTraceList.add(logRequestDto);
+            }
+            return FailedJobResponse.builder()
+                    .error(false)
+                    .result(logTraceList)
+                    .build();
+        } catch (Exception e) {
+            log.error("Failed to fetch failed job", e);
+            throw e;
+        }
+    }
+
+    @Override
+    public FailedJobResponse getFirstHundredElasticFailedJob(String apiKey) {
+        setTenant(apiKey);
+        try {
+            List<LogTrace> failedGeoLocationTrace = logTraceRepository.getFirstHundredElasticDocumentAccordingToStatus(OperationStatus.FAILED.toString());
+            if (failedGeoLocationTrace.isEmpty()) {
+                return FailedJobResponse.builder()
+                        .error(false)
+                        .result(Collections.emptyList())
+                        .build();
+            }
+            ArrayList<LogRequestDto> logTraceList = new ArrayList<>();
+            for (LogTrace logTrace : failedGeoLocationTrace) {
+                LogRequestDto logRequestDto = buildLogRequestDtoFromLogTrace(logTrace);
+                logTraceList.add(logRequestDto);
+            }
+
+            return FailedJobResponse.builder()
+                    .error(false)
+                    .result(logTraceList)
+                    .build();
+        } catch (Exception e) {
+            log.error("Failed to fetch failed job", e);
+            throw e;
+        }
+    }
+
+    private LogRequestDto buildLogRequestDtoFromLogTrace(LogTrace logTrace) {
+        LogRequestDto logRequestDto = new LogRequestDto();
+        BeanUtils.copyProperties(logTrace, logRequestDto);
+        HttpTrace httpTrace = logTrace.getHttpTrace();
+        if (httpTrace != null) {
+            logRequestDto.toBuilder()
+                    .clientIp(httpTrace.getClientIp())
+                    .durationMs(httpTrace.getDurationMs())
+                    .method(httpTrace.getMethod())
+                    .path(httpTrace.getPath())
+                    .status(httpTrace.getStatus())
+                    .userAgent(httpTrace.getUserAgent())
+                    .build();
+        }
+        ExceptionTrace exceptionTrace = logTrace.getExceptionTrace();
+        if (exceptionTrace != null) {
+            logRequestDto.toBuilder()
+                    .exceptionClass(exceptionTrace.getExceptionClass())
+                    .exceptionId(exceptionTrace.getExceptionId())
+                    .exceptionMessage(exceptionTrace.getExceptionMessage())
+                    .stackTrace(exceptionTrace.getStackTrace())
+                    .build();
+        }
+        MetaDataTrace metaDataTrace = logTrace.getMetaDataTrace();
+        if (metaDataTrace != null) {
+            logRequestDto.toBuilder()
+                    .region(metaDataTrace.getRegion())
+                    .timeZone(metaDataTrace.getTimeZone())
+                    .version(metaDataTrace.getVersion())
+                    .build();
+        }
+        LogPrimeKey logPrimeKey = logTrace.getLogPrimaryKey();
+        if (logPrimeKey != null) {
+            logRequestDto.toBuilder()
+                    .logId(logPrimeKey.getLogId())
+                    .traceId(logPrimeKey.getTraceId())
+                    .timeStamp(logPrimeKey.getTimeStamp())
+                    .build();
+        }
+        return logRequestDto;
+    }
+
     private void setTenant(String apiKey) {
+        System.out.println("___________ controller"+ apiKey);
         UserApiKeyResponseDto apiKeyDetails = apiKeyService.getTenantDetails(apiKey);
         TenantContext.currentTenant.set(apiKeyDetails.getTenantId());
         UserNameContext.currentUser.set(apiKeyDetails.getUserName());

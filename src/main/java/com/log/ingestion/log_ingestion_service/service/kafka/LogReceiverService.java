@@ -20,7 +20,7 @@ public class LogReceiverService {
     private final LogTraceService logTraceService;
     private final ApiKeyService apiKeyService;
 
-    @KafkaListener(topics = "LogIngestion", groupId = "log-consumer-group")
+    @KafkaListener(topics = "LogIngestion", groupId = "${log.initial.consumer.group-id}")
     public void kafkaMessageReaderMessageResolver(LogRequestDto logRequestDto, Acknowledgment ack) {
         log.info("Entering into save mode, at kafka Message receiver");
         boolean isSet = setTenant(logRequestDto.getApiKey());
@@ -35,7 +35,7 @@ public class LogReceiverService {
         }
     }
 
-    @KafkaListener(topics = "LogIngestion-dlt")
+    @KafkaListener(topics = "LogIngestion-dlt", groupId = "${log.initial.consumer.group-id}")
     public void dltConsumer(String message, Acknowledgment ack) {
         try {
             System.out.println("Failed message" + message);

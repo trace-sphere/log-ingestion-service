@@ -1,5 +1,6 @@
 package com.log.ingestion.log_ingestion_service.config;
 
+import com.log.ingestion.log_ingestion_service.util.LogConstants;
 import jakarta.servlet.FilterChain;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -19,13 +20,17 @@ public class WebSecurityConfig {
                 .requestMatchers("/logTrace/test/request").permitAll()
                 .requestMatchers("/logTrace/getBySearch").permitAll()
                 .requestMatchers("/dashboard/getAll").permitAll()
+                .requestMatchers("/internal/retry/failedGeoLocation")
+                .hasAuthority(LogConstants.SERVICE_ROLE.INTERNAL_SCHEDULER)
+                .requestMatchers("/internal/retry/failedElasticDocument")
+                .hasAuthority(LogConstants.SERVICE_ROLE.INTERNAL_SCHEDULER)
                 .anyRequest().authenticated());
 
         httpSecurity.cors(AbstractHttpConfigurer::disable);
         httpSecurity.csrf(AbstractHttpConfigurer::disable);
 
         httpSecurity.oauth2ResourceServer((auth) ->
-                auth.jwt((jwt) -> jwt.jwtAuthenticationConverter(new JwtAuthenticationConverter()))
+                auth.jwt((jwt) -> jwt.jwtAuthenticationConverter(new JwtConverter()))
         );
         return httpSecurity.build();
     }

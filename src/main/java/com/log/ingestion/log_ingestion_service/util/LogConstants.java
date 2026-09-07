@@ -31,4 +31,8 @@ public class LogConstants {
         public static final String FAILED = "FAILED";
         public static final String MAX_RETRY_FAILED = "MAXIMUM_RETRY_FAILED";
     }
+
+    public static class SERVICE_ROLE {
+        public static final String INTERNAL_SCHEDULER = "internal-scheduler-service";
+    }
 }

@@ -46,4 +46,11 @@ public interface LogTraceRepository extends JpaRepository<LogTrace, LogPrimeKey>
     @Modifying
     @Query(value = "update log_trace set elastic_operation_status = :status where trace_id = :traceId", nativeQuery = true)
     public int updateElasticOperationStatus(@Param("traceId") String traceId, @Param("status") String operation_status);
+
+    @Query(value = "select lt from log_trace lt where lt.geo_location_operation_status = :status limit 100", nativeQuery = true)
+    public List<LogTrace> getFirstHundredGeoLocationAccordingToStatus(@Param("status") String status);
+
+    @Query(value = "select lt from log_trace lt where lt.elastic_operation_status = :status limit 100", nativeQuery = true)
+    public List<LogTrace> getFirstHundredElasticDocumentAccordingToStatus(@Param("status") String status);
+
 }
